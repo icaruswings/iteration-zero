@@ -31,6 +31,13 @@ export const getById = query({
   },
 });
 
+export const get = query({
+  args: { id: v.id("iterations") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
 export const update = mutation({
   args: {
     id: v.id("iterations"),

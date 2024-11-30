@@ -1,5 +1,6 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 export const create = mutation({
   args: {
@@ -13,9 +14,16 @@ export const create = mutation({
     worstCaseEstimate: v.number(),
   },
   handler: async (ctx, args) => {
+    const now = new Date().toISOString();
     const task = await ctx.db.insert("tasks", {
       ...args,
-      status: "todo",
+      status: "pending",
+      statusHistory: [{
+        status: "pending",
+        timestamp: now,
+      }],
+      createdAt: now,
+      completedAt: undefined,
     });
     return task;
   },
@@ -26,28 +34,31 @@ export const listByIteration = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("tasks")
-      .filter((q) => q.eq(q.field("iterationId"), args.iterationId))
+      .withIndex("by_iteration", (q) => q.eq("iterationId", args.iterationId))
       .collect();
   },
 });
 
-export const update = mutation({
+export const updateStatus = mutation({
   args: {
     id: v.id("tasks"),
-    title: v.optional(v.string()),
-    description: v.optional(v.string()),
-    status: v.optional(v.string()),
-    priority: v.optional(v.string()),
-    assignee: v.optional(v.string()),
-    bestCaseEstimate: v.optional(v.number()),
-    likelyCaseEstimate: v.optional(v.number()),
-    worstCaseEstimate: v.optional(v.number()),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
   },
   handler: async (ctx, args) => {
-    const { id, ...fields } = args;
-    const task = await ctx.db.patch(id, {
-      ...fields,
+    const { id, status } = args;
+    const now = new Date().toISOString();
+    
+    const task = await ctx.db.get(id);
+    if (!task) throw new Error("Task not found");
+
+    const currentHistory = task.statusHistory ?? [];
+    const newHistory = [...currentHistory, { status, timestamp: now }];
+
+    const updatedTask = await ctx.db.patch(id, {
+      status,
+      statusHistory: newHistory,
+      completedAt: status === "completed" ? now : undefined,
     });
-    return task;
+    return updatedTask;
   },
 });

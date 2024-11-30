@@ -1,17 +1,55 @@
 import { useParams } from "@remix-run/react";
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import { useMutation, useQuery } from "convex/react";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useState } from "react";
 import NewTaskModal from "../components/NewTaskModal";
+import BurndownChart from "~/components/BurndownChart";
+import { api } from "convex/_generated/api";
+import { Id } from "convex/_generated/dataModel";
 
 export default function IterationDetails() {
   const { id } = useParams();
-  const iteration = useQuery(api.iterations.getById, { id: id as Id<"iterations"> });
-  const tasks = useQuery(api.tasks.listByIteration, { iterationId: id as Id<"iterations"> });
+  const iterationId = id as Id<"iterations">;
+  const iteration = useQuery(api.iterations.get, { id: iterationId });
+  const tasks = useQuery(api.tasks.listByIteration, { iterationId });
+  const updateStatus = useMutation(api.tasks.updateStatus);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
 
-  if (!iteration) return <div>Loading...</div>;
+  const [columns] = useState({
+    pending: {
+      title: "Pending",
+      status: "pending" as const,
+    },
+    inProgress: {
+      title: "In Progress",
+      status: "in_progress" as const,
+    },
+    completed: {
+      title: "Completed",
+      status: "completed" as const,
+    },
+  });
+
+  const onDragEnd = (result: any) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    const newStatus = columns[destination.droppableId as keyof typeof columns].status;
+    updateStatus({ id: draggableId as Id<"tasks">, status: newStatus });
+  };
+
+  if (!iteration || !tasks) return <div>Loading...</div>;
+
+  const getTasksByStatus = (status: "pending" | "in_progress" | "completed") => {
+    return tasks.filter((task) => task.status === status);
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -19,84 +57,74 @@ export default function IterationDetails() {
         <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
           {iteration.name}
         </h1>
-        <div className="mt-2 flex items-center gap-4">
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            {iteration.startDate} - {iteration.endDate}
-          </span>
-          <span className={`inline-block rounded-full px-2 py-1 text-sm ${
-            iteration.status === "active"
-              ? "bg-green-100 text-green-800"
-              : "bg-gray-100 text-gray-800"
-          }`}>
-            {iteration.status}
-          </span>
-        </div>
+        <p className="mt-2 text-gray-600 dark:text-gray-300">{iteration.description}</p>
       </header>
 
-      <div className="mb-8">
-        <h2 className="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-100">
-          Description
-        </h2>
-        <p className="text-gray-600 dark:text-gray-300">{iteration.description}</p>
-      </div>
+      <BurndownChart iterationId={id as Id<"iterations">} />
 
-      <div className="mb-8">
-        <h2 className="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-100">
-          Goals
-        </h2>
-        <ul className="list-inside list-disc space-y-2">
-          {iteration.goals.map((goal, index) => (
-            <li key={index} className="text-gray-600 dark:text-gray-300">
-              {goal}
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <div className="mb-4 flex items-center justify-between">
+      <div className="mt-8">
+        <div className="mb-4 flex justify-between items-center">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
             Tasks
           </h2>
           <button
-            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
             onClick={() => setIsNewTaskModalOpen(true)}
+            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
           >
-            New Task
+            Add Task
           </button>
         </div>
 
-        <div className="grid gap-4">
-          {tasks?.map((task) => (
-            <div
-              key={task._id}
-              className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800"
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">{task.title}</h3>
-                  <p className="mt-1 text-gray-600 dark:text-gray-300">{task.description}</p>
-                  
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Status: <span className="font-medium text-gray-900 dark:text-white">{task.status}</span></p>
-                      <p className="text-sm text-gray-500">Priority: <span className="font-medium text-gray-900 dark:text-white">{task.priority}</span></p>
-                      {task.assignee && (
-                        <p className="text-sm text-gray-500">Assignee: <span className="font-medium text-gray-900 dark:text-white">{task.assignee}</span></p>
-                      )}
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="flex gap-4">
+            {Object.entries(columns).map(([columnId, column]) => (
+              <div key={columnId} className="flex-1">
+                <h2 className="font-semibold mb-2">{column.title}</h2>
+                <Droppable droppableId={columnId}>
+                  {(provided) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className="bg-gray-100 p-4 rounded-lg min-h-[200px]"
+                    >
+                      {getTasksByStatus(column.status).map((task, index) => (
+                        <Draggable
+                          key={task._id}
+                          draggableId={task._id}
+                          index={index}
+                        >
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="bg-white p-4 rounded shadow mb-2 cursor-move"
+                            >
+                              <h3 className="font-medium">{task.title}</h3>
+                              <p className="text-sm text-gray-600">{task.description}</p>
+                              <div className="mt-2 text-sm">
+                                <span className={`px-2 py-1 rounded ${
+                                  task.priority === "High" 
+                                    ? "bg-red-100 text-red-800"
+                                    : task.priority === "Medium"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-green-100 text-green-800"
+                                }`}>
+                                  {task.priority}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Time Estimates (days):</p>
-                      <p className="text-sm text-gray-500">Best: <span className="font-medium text-gray-900 dark:text-white">{task.bestCaseEstimate}</span></p>
-                      <p className="text-sm text-gray-500">Likely: <span className="font-medium text-gray-900 dark:text-white">{task.likelyCaseEstimate}</span></p>
-                      <p className="text-sm text-gray-500">Worst: <span className="font-medium text-gray-900 dark:text-white">{task.worstCaseEstimate}</span></p>
-                    </div>
-                  </div>
-                </div>
+                  )}
+                </Droppable>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </DragDropContext>
       </div>
 
       <NewTaskModal
