@@ -4,25 +4,34 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLoaderData,
+  useRouteLoaderData,
 } from "@remix-run/react";
-import type { LinksFunction } from "@remix-run/node";
-
-import "./tailwind.css";
+import type { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
+import tailwind from "./tailwind.css?url";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { PropsWithChildren, useState } from "react";
+import invariant from "tiny-invariant";
 
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
+  { rel: "stylesheet", href: tailwind },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export const loader = async (args: LoaderFunctionArgs) => {
+    invariant(process.env.CONVEX_URL, "CONVEX_URL is required");
+
+    return {
+      ENV: {
+        CONVEX_URL: process.env.CONVEX_URL,
+      }
+    };
+};
+
+export const useRootLoaderData = () =>
+  useRouteLoaderData<typeof loader>("root");
+
+
+function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -40,6 +49,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Providers({ children }: PropsWithChildren<unknown>) {
+  const { ENV } = useLoaderData<typeof loader>();
+  const [convexClient] = useState(new ConvexReactClient(ENV.CONVEX_URL));
+
+  return (
+    <ConvexProvider client={convexClient}>
+      <Layout>{children}</Layout>
+    </ConvexProvider>
+  );
+}
+
 export default function App() {
-  return <Outlet />;
+  return (
+    <Providers>
+      <Outlet />
+    </Providers>
+  );
 }
