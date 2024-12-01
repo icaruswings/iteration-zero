@@ -28,4 +28,28 @@ export default defineSchema({
     createdAt: v.optional(v.string()),
     completedAt: v.optional(v.string()), // Date when task was marked as completed
   }).index("by_iteration", ["iterationId"]),
+
+  estimationSessions: defineTable({
+    iterationId: v.id("iterations"),
+    taskId: v.optional(v.id("tasks")),
+    sessionUrl: v.string(),
+    status: v.union(v.literal("active"), v.literal("locked")),
+    managerId: v.string(),
+    createdAt: v.string(),
+    participants: v.array(v.object({
+      participantId: v.string(),
+      name: v.string(),
+    })),
+  }).index("by_iteration", ["iterationId"]),
+
+  estimates: defineTable({
+    sessionId: v.id("estimationSessions"),
+    taskId: v.id("tasks"),
+    participantId: v.string(),
+    bestCase: v.number(),
+    likelyCase: v.number(),
+    worstCase: v.number(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_session_task", ["sessionId", "taskId"]),
 });

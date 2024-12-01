@@ -1,14 +1,17 @@
 import { useParams } from "@remix-run/react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useState } from "react";
 import NewTaskModal from "../components/NewTaskModal";
 import BurndownChart from "~/components/BurndownChart";
 import { api } from "convex/_generated/api";
 import { Id } from "convex/_generated/dataModel";
+import { nanoid } from "nanoid";
+import { createEstimationSession } from "~/utils/estimation";
 
 export default function IterationDetails() {
   const { id } = useParams();
+  const convex = useConvex();
   const iterationId = id as Id<"iterations">;
   const iteration = useQuery(api.iterations.get, { id: iterationId });
   const tasks = useQuery(api.tasks.listByIteration, { iterationId });
@@ -63,16 +66,34 @@ export default function IterationDetails() {
       <BurndownChart iterationId={id as Id<"iterations">} />
 
       <div className="mt-8">
-        <div className="mb-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
-            Tasks
-          </h2>
-          <button
-            onClick={() => setIsNewTaskModalOpen(true)}
-            className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            Add Task
-          </button>
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <button
+              onClick={() => setIsNewTaskModalOpen(true)}
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mr-2"
+            >
+              Add Task
+            </button>
+            <button
+              onClick={async () => {
+                const managerId = nanoid();
+                sessionStorage.setItem("participantId", managerId);
+                sessionStorage.setItem("participantName", "Iteration Manager");
+                
+                const session = await createEstimationSession({
+                  convex,
+                  iterationId,
+                  managerId,
+                  managerName: "Iteration Manager",
+                });
+
+                window.open(`/estimation/${session.sessionUrl}`, "_blank");
+              }}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Start Estimation Session
+            </button>
+          </div>
         </div>
 
         <DragDropContext onDragEnd={onDragEnd}>
