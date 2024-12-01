@@ -67,7 +67,7 @@ export default function EstimationSession() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading session...</p>
+          <p className="text-gray-600 dark:text-gray-400">Loading session...</p>
         </div>
       </div>
     );
@@ -78,13 +78,13 @@ export default function EstimationSession() {
   if (showNamePrompt) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-          <h2 className="text-xl font-bold mb-4">Enter your name</h2>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+          <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">Enter your name</h2>
           <input
             type="text"
             value={participantName}
             onChange={(e) => setParticipantName(e.target.value)}
-            className="w-full p-2 border rounded mb-4"
+            className="w-full p-2 border rounded mb-4 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
             placeholder="Your name"
           />
           <button
@@ -98,7 +98,7 @@ export default function EstimationSession() {
                 setShowNamePrompt(false);
               }
             }}
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 dark:hover:bg-blue-500"
           >
             Join Session
           </button>
@@ -126,40 +126,70 @@ export default function EstimationSession() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2">Estimation Session</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Estimation Session</h1>
+        <p className="text-gray-600 dark:text-gray-400">
           Share this URL with your team: {window.location.href}
         </p>
       </div>
 
       <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Participants</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Participants</h2>
         <div className="flex flex-wrap gap-2">
-          {session.participants.map((p) => (
-            <div
-              key={p.participantId}
-              className="bg-gray-100 px-3 py-1 rounded-full text-sm"
-            >
-              {p.name}
-              {p.participantId === session.managerId && (
-                <span className="ml-1 text-gray-500">(Manager)</span>
-              )}
-            </div>
-          ))}
+          {session.participants.map((p) => {
+            const hasSubmitted = allEstimates?.some(
+              (e) => e.participantId === p.participantId
+            );
+            return (
+              <div
+                key={p.participantId}
+                className={`flex items-center px-3 py-1 rounded-full text-sm ${
+                  hasSubmitted
+                    ? "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  {p.name}
+                  {p.participantId === session.managerId && (
+                    <span className={`ml-1 ${
+                      hasSubmitted
+                        ? "text-green-600 dark:text-green-300"
+                        : "text-gray-500 dark:text-gray-400"
+                    }`}>
+                      (Manager)
+                    </span>
+                  )}
+                  {hasSubmitted && (
+                    <svg
+                      className="w-4 h-4 ml-1 text-green-600 dark:text-green-300"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path d="M5 13l4 4L19 7"></path>
+                    </svg>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {isManager && !task && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4">Select a Task to Estimate</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Select a Task to Estimate</h2>
           {!availableTasks ? (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="text-center text-gray-600 mt-2">Loading tasks...</p>
+              <p className="text-center text-gray-600 dark:text-gray-400 mt-2">Loading tasks...</p>
             </div>
           ) : availableTasks.length === 0 ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-center text-gray-600">No tasks available for estimation.</p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <p className="text-center text-gray-600 dark:text-gray-400">No tasks available for estimation.</p>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -171,17 +201,17 @@ export default function EstimationSession() {
                     taskId: t._id,
                     managerId: participantId,
                   })}
-                  className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
+                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
                 >
-                  <h3 className="font-medium">{t.title}</h3>
-                  <p className="text-gray-600 text-sm mt-1">{t.description}</p>
+                  <h3 className="font-medium text-gray-800 dark:text-gray-100">{t.title}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{t.description}</p>
                   <div className="mt-2">
                     <span className={`inline-block px-2 py-1 text-sm rounded ${
                       t.priority === "high" 
-                        ? "bg-red-100 text-red-800"
+                        ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100"
                         : t.priority === "medium"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-green-100 text-green-800"
+                        ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
+                        : "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
                     }`}>
                       {t.priority}
                     </span>
@@ -194,22 +224,24 @@ export default function EstimationSession() {
       )}
 
       {task ? (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Current Task</h2>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Current Task</h2>
           <div className="mb-4">
-            <h3 className="font-medium">{task.title}</h3>
-            <p className="text-gray-600">{task.description}</p>
+            <h3 className="font-medium text-gray-800 dark:text-gray-100">{task.title}</h3>
+            <p className="text-gray-600 dark:text-gray-400">{task.description}</p>
           </div>
 
           {session.status === "active" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Best Case (days)
+                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Best (days)
                   </label>
                   <input
                     type="number"
+                    min="0.5"
+                    step="0.5"
                     value={estimates.bestCase || currentEstimate?.bestCase || 0}
                     onChange={(e) =>
                       setEstimates((prev) => ({
@@ -217,15 +249,17 @@ export default function EstimationSession() {
                         bestCase: parseFloat(e.target.value),
                       }))
                     }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Likely Case (days)
+                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Likely (days)
                   </label>
                   <input
                     type="number"
+                    min="0.5"
+                    step="0.5"
                     value={estimates.likelyCase || currentEstimate?.likelyCase || 0}
                     onChange={(e) =>
                       setEstimates((prev) => ({
@@ -233,15 +267,17 @@ export default function EstimationSession() {
                         likelyCase: parseFloat(e.target.value),
                       }))
                     }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Worst Case (days)
+                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Worst (days)
                   </label>
                   <input
                     type="number"
+                    min="0.5"
+                    step="0.5"
                     value={estimates.worstCase || currentEstimate?.worstCase || 0}
                     onChange={(e) =>
                       setEstimates((prev) => ({
@@ -249,7 +285,7 @@ export default function EstimationSession() {
                         worstCase: parseFloat(e.target.value),
                       }))
                     }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -263,10 +299,70 @@ export default function EstimationSession() {
                     ...estimates,
                   })
                 }
-                className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+                className="mt-8 w-full bg-blue-500 text-white p-4 text-lg font-medium rounded-lg hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"
               >
                 Submit Estimate
               </button>
+            </div>
+          )}
+
+          {isManager && session.status === "active" && allEstimates && allEstimates.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">Submitted Estimates</h3>
+              <div className="space-y-4">
+                {allEstimates.map((estimate) => {
+                  const participant = session.participants.find(
+                    (p) => p.participantId === estimate.participantId
+                  );
+                  return (
+                    <div
+                      key={estimate._id}
+                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-gray-800 dark:text-gray-100">
+                          {participant?.name}
+                        </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {new Date(estimate._creationTime).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Best:</span>
+                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.bestCase} days</span>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Likely:</span>
+                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.likelyCase} days</span>
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Worst:</span>
+                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.worstCase} days</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
+                <h4 className="font-medium text-blue-800 dark:text-blue-100 mb-2">Current Average</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <span className="text-sm text-blue-600 dark:text-blue-300">Best:</span>
+                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.bestCase} days</span>
+                  </div>
+                  <div>
+                    <span className="text-sm text-blue-600 dark:text-blue-300">Likely:</span>
+                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.likelyCase} days</span>
+                  </div>
+                  <div>
+                    <span className="text-sm text-blue-600 dark:text-blue-300">Worst:</span>
+                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.worstCase} days</span>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -281,7 +377,7 @@ export default function EstimationSession() {
                   likelyCase: averageEstimates?.likelyCase ?? 0, 
                   worstCase: averageEstimates?.worstCase ?? 0 
                 })}
-                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600"
+                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600 dark:hover:bg-yellow-500"
               >
                 Lock Estimates
               </button>
@@ -290,46 +386,46 @@ export default function EstimationSession() {
 
           {session.status === "locked" && allEstimates && (
             <div className="mt-4">
-              <h3 className="font-medium mb-2">Final Estimates</h3>
+              <h3 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Final Estimates</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Best Case (days)
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Best (days)
                   </label>
-                  <div className="mt-1 text-lg">{averageEstimates?.bestCase}</div>
+                  <div className="mt-1 text-lg text-gray-800 dark:text-gray-100">{averageEstimates?.bestCase}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Likely Case (days)
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Likely (days)
                   </label>
-                  <div className="mt-1 text-lg">{averageEstimates?.likelyCase}</div>
+                  <div className="mt-1 text-lg text-gray-800 dark:text-gray-100">{averageEstimates?.likelyCase}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Worst Case (days)
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Worst (days)
                   </label>
-                  <div className="mt-1 text-lg">{averageEstimates?.worstCase}</div>
+                  <div className="mt-1 text-lg text-gray-800 dark:text-gray-100">{averageEstimates?.worstCase}</div>
                 </div>
               </div>
             </div>
           )}
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">
             {isManager ? "Task Selection" : "Waiting for Task Selection"}
           </h2>
           {isManager ? (
             availableTasks === null ? (
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                <p className="text-gray-600">Loading available tasks...</p>
+                <p className="text-gray-600 dark:text-gray-400">Loading available tasks...</p>
               </div>
             ) : (
-              <p className="text-gray-600">Please select a task above to begin estimation.</p>
+              <p className="text-gray-600 dark:text-gray-400">Please select a task above to begin estimation.</p>
             )
           ) : (
-            <p className="text-gray-600">The session manager will select a task to estimate.</p>
+            <p className="text-gray-600 dark:text-gray-400">The session manager will select a task to estimate.</p>
           )}
         </div>
       )}
