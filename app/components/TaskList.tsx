@@ -107,20 +107,18 @@ export default function TaskList({ tasks: serverTasks, columns, onStatusUpdate }
                           ref={provided.innerRef}
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
-                          className="bg-white dark:bg-gray-700 p-4 rounded shadow mb-2 cursor-move"
+                          className="bg-white dark:bg-gray-700 p-4 rounded shadow mb-2 cursor-move relative"
                         >
+                          <div className={`absolute top-0 right-0 w-2 h-8 rounded-tr ${
+                            task.priority === "High" 
+                              ? "bg-red-500"
+                              : task.priority === "Medium"
+                              ? "bg-yellow-500"
+                              : "bg-green-500"
+                          }`} />
                           <h3 className="font-medium dark:text-gray-100">{task.title}</h3>
                           <p className="text-sm text-gray-600 dark:text-gray-300">{task.description}</p>
                           <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
-                            <span className={`px-2 py-1 rounded ${
-                              task.priority === "High" 
-                                ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                                : task.priority === "Medium"
-                                ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
-                                : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                            }`}>
-                              {task.priority}
-                            </span>
                             {task.createdAt && (
                               <span className="text-gray-500 dark:text-gray-400">
                                 Created: {formatDate(task.createdAt)}

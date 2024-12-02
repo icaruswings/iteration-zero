@@ -14,7 +14,7 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
   
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("medium");
+  const [priority, setPriority] = useState<"High" | "Medium" | "Low">("Medium");
   const [assignee, setAssignee] = useState("");
   const [bestCaseEstimate, setBestCaseEstimate] = useState(1);
   const [likelyCaseEstimate, setLikelyCaseEstimate] = useState(2);
@@ -122,12 +122,12 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
               </label>
               <select
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
+                onChange={(e) => setPriority(e.target.value as "High" | "Medium" | "Low")}
                 className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+                <option value="High">High</option>
+                <option value="Medium">Medium</option>
+                <option value="Low">Low</option>
               </select>
             </div>
 

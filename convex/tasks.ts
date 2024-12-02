@@ -13,7 +13,7 @@ export const create = mutation({
     iterationId: v.id("iterations"),
     title: v.string(),
     description: v.string(),
-    priority: v.string(),
+    priority: v.union(v.literal("High"), v.literal("Medium"), v.literal("Low")),
     assignee: v.optional(v.string()),
     bestCaseEstimate: v.number(),
     likelyCaseEstimate: v.number(),
@@ -42,6 +42,15 @@ export const listByIteration = query({
       .query("tasks")
       .withIndex("by_iteration", (q) => q.eq("iterationId", args.iterationId))
       .collect();
+  },
+});
+
+export const listRecent = query({
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("tasks")
+      .order("desc")
+      .take(5);
   },
 });
 

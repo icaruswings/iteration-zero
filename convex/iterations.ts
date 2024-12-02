@@ -19,8 +19,17 @@ export const create = mutation({
 });
 
 export const list = query({
-  handler: async (ctx) => {
-    return await ctx.db.query("iterations").collect();
+  args: {
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let q = ctx.db.query("iterations");
+    
+    if (args.status) {
+      q = q.filter((q) => q.eq(q.field("status"), args.status));
+    }
+    
+    return await q.collect();
   },
 });
 
@@ -41,18 +50,21 @@ export const get = query({
 export const update = mutation({
   args: {
     id: v.id("iterations"),
-    name: v.optional(v.string()),
-    startDate: v.optional(v.string()),
-    endDate: v.optional(v.string()),
-    description: v.optional(v.string()),
-    goals: v.optional(v.array(v.string())),
-    status: v.optional(v.string()),
+    name: v.string(),
+    startDate: v.string(),
+    endDate: v.string(),
+    description: v.string(),
+    goals: v.array(v.string()),
+    status: v.string(),
   },
   handler: async (ctx, args) => {
-    const { id, ...fields } = args;
-    const iteration = await ctx.db.patch(id, {
-      ...fields,
-    });
-    return iteration;
+    const { id, ...updates } = args;
+    const iteration = await ctx.db.get(id);
+    
+    if (!iteration) {
+      throw new Error("Iteration not found");
+    }
+
+    return await ctx.db.patch(id, updates);
   },
 });

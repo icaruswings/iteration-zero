@@ -2,13 +2,13 @@ import { useParams } from "@remix-run/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "convex/_generated/api";
 import { useState, useEffect } from "react";
+import { useUser } from "@clerk/remix";
 import { nanoid } from "nanoid";
 
 export default function EstimationSession() {
   const { sessionUrl } = useParams();
-  const [participantId, setParticipantId] = useState("");
-  const [participantName, setParticipantName] = useState("");
-  const [showNamePrompt, setShowNamePrompt] = useState(true);
+  const { user } = useUser();
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [estimationFilter, setEstimationFilter] = useState("all");
   const [estimates, setEstimates] = useState({
     bestCase: 0,
@@ -48,74 +48,33 @@ export default function EstimationSession() {
   const saveFinalEstimates = useMutation(api.estimationSessions.saveFinalEstimates);
   const selectTask = useMutation(api.estimationSessions.selectTask);
 
-  // Initialize client-side state from sessionStorage
   useEffect(() => {
-    const storedParticipantId = sessionStorage.getItem("participantId");
-    const storedParticipantName = sessionStorage.getItem("participantName");
+    if (!user) return;
     
-    setParticipantId(storedParticipantId || nanoid());
-    setParticipantName(storedParticipantName || "");
-    setShowNamePrompt(!storedParticipantName);
-  }, []);
-
-  useEffect(() => {
-    if (participantId) {
-      sessionStorage.setItem("participantId", participantId);
+    if (session && !session.participants.find(p => p.participantId === user.id)) {
+      joinSession({
+        sessionId: session._id,
+        participantId: user.id,
+        participantName: user.fullName || user.username || "Anonymous",
+        email: user.primaryEmailAddress?.emailAddress,
+        imageUrl: user.imageUrl,
+      });
     }
-  }, [participantId]);
+  }, [user, session]);
 
-  useEffect(() => {
-    if (participantName) {
-      sessionStorage.setItem("participantName", participantName);
-    }
-  }, [participantName]);
-
-  if (!session) {
+  if (!user || !session) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading session...</p>
+          <h1 className="text-2xl font-bold mb-4">Loading...</h1>
+          <p className="text-gray-600">Please wait while we set up your session</p>
         </div>
       </div>
     );
   }
 
-  const isManager = session.managerId === participantId;
-
-  if (showNamePrompt) {
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
-          <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100">Enter your name</h2>
-          <input
-            type="text"
-            value={participantName}
-            onChange={(e) => setParticipantName(e.target.value)}
-            className="w-full p-2 border rounded mb-4 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
-            placeholder="Your name"
-          />
-          <button
-            onClick={async () => {
-              if (participantName.trim()) {
-                await joinSession({
-                  sessionUrl: sessionUrl || "",
-                  participantId,
-                  participantName: participantName.trim(),
-                });
-                setShowNamePrompt(false);
-              }
-            }}
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 dark:hover:bg-blue-500"
-          >
-            Join Session
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const currentEstimate = allEstimates?.find(e => e.participantId === participantId);
+  const isManager = session.managerId === user.id;
+  const currentEstimate = allEstimates?.find(e => e.participantId === user.id);
   const averageEstimates = allEstimates?.reduce(
     (acc, curr) => ({
       bestCase: acc.bestCase + curr.bestCase,
@@ -157,7 +116,7 @@ export default function EstimationSession() {
                 }`}
               >
                 <div className="flex items-center gap-1">
-                  {p.participantId === participantId ? "Me" : p.name}
+                  {p.participantId === user.id ? "Me" : p.name}
                   {p.participantId === session.managerId && (
                     <span className={`ml-1 ${
                       hasSubmitted
@@ -225,7 +184,7 @@ export default function EstimationSession() {
                     onClick={() => selectTask({
                       sessionId: session._id,
                       taskId: t._id,
-                      managerId: participantId,
+                      managerId: user.id,
                     })}
                     className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
                   >
@@ -233,9 +192,9 @@ export default function EstimationSession() {
                     <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{t.description}</p>
                     <div className="mt-2">
                       <span className={`inline-block px-2 py-1 text-sm rounded ${
-                        t.priority === "high" 
+                        t.priority === "High" 
                           ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100"
-                          : t.priority === "medium"
+                          : t.priority === "Medium"
                           ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
                           : "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
                       }`}>
@@ -279,20 +238,20 @@ export default function EstimationSession() {
                       await saveFinalEstimates({
                         sessionId: session._id,
                         taskId: task._id,
-                        managerId: participantId,
+                        managerId: user.id,
                         ...finalEstimates,
                       });
 
                       // Lock the session
                       await lockEstimates({
                         sessionId: session._id,
-                        managerId: participantId,
+                        managerId: user.id,
                       });
                         
                     } else if (session.status === "locked") {
                       await unlockEstimates({
                         sessionId: session._id,
-                        managerId: participantId,
+                        managerId: user.id,
                       });
                     }
                   }}
@@ -423,7 +382,7 @@ export default function EstimationSession() {
                     submitEstimate({
                       sessionId: session._id,
                       taskId: task._id,
-                      participantId,
+                      participantId: user.id,
                       ...estimates,
                     })
                   }
@@ -455,7 +414,7 @@ export default function EstimationSession() {
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-gray-800 dark:text-gray-100">
-                            {participant?.participantId === participantId ? "Me" : participant?.name}
+                            {participant?.participantId === user.id ? "Me" : participant?.name}
                           </span>
                           <span className="text-sm text-gray-500 dark:text-gray-400">
                             {new Date(estimate._creationTime).toLocaleTimeString()}
@@ -510,7 +469,8 @@ export default function EstimationSession() {
                   onClick={async () => {
                     await selectTask({
                       sessionId: session._id,
-                      managerId: participantId,
+                      managerId: user.id,
+                      taskId: null
                     });
                   }}
                   className="mt-6 w-full bg-blue-500 text-white p-4 text-lg font-medium rounded-lg hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"

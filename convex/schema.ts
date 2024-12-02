@@ -17,7 +17,7 @@ export default defineSchema({
     description: v.string(),
     status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
     assignee: v.optional(v.string()),
-    priority: v.string(),
+    priority: v.union(v.literal("High"), v.literal("Medium"), v.literal("Low")),
     bestCaseEstimate: v.number(), // in days
     likelyCaseEstimate: v.number(), // in days
     worstCaseEstimate: v.number(), // in days
@@ -39,6 +39,8 @@ export default defineSchema({
     participants: v.array(v.object({
       participantId: v.string(),
       name: v.string(),
+      email: v.optional(v.string()),
+      imageUrl: v.optional(v.string()),
     })),
   }).index("by_iteration", ["iterationId"]),
 

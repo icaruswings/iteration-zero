@@ -8,7 +8,7 @@ import {
   useRouteLoaderData,
 } from "@remix-run/react";
 import tailwind from "./tailwind.css?url";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { PropsWithChildren, useState } from "react";
 import invariant from "tiny-invariant";
 import { ClerkApp, useAuth } from "@clerk/remix";
@@ -50,7 +50,7 @@ function Layout({ children }: { children: React.ReactNode }) {
       <body className="min-h-full flex flex-col bg-white dark:bg-gray-900">
         <SidebarProvider>
           <AppSidebar />
-          <main>
+          <main className="w-full max-w-4xl">
             <SidebarTrigger />
             {children}
             <Footer />

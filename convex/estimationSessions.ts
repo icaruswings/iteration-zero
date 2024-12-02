@@ -35,16 +35,14 @@ export const create = mutation({
 
 export const join = mutation({
   args: {
-    sessionUrl: v.string(),
+    sessionId: v.id("estimationSessions"),
     participantId: v.string(),
     participantName: v.string(),
+    email: v.optional(v.string()),
+    imageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const session = await ctx.db
-      .query("estimationSessions")
-      .filter((q) => q.eq(q.field("sessionUrl"), args.sessionUrl))
-      .first();
-
+    const session = await ctx.db.get(args.sessionId);
     if (!session) {
       throw new Error("Session not found");
     }
@@ -62,14 +60,14 @@ export const join = mutation({
     }
 
     // Add new participant
-    const updatedSession = await ctx.db.patch(session._id, {
+    return await ctx.db.patch(args.sessionId, {
       participants: [...session.participants, {
         participantId: args.participantId,
         name: args.participantName,
+        email: args.email,
+        imageUrl: args.imageUrl,
       }],
     });
-
-    return updatedSession;
   },
 });
 
@@ -90,7 +88,7 @@ export const selectTask = mutation({
     }
 
     return await ctx.db.patch(args.sessionId, {
-      taskId: args.taskId ?? null,
+      taskId: args.taskId ?? undefined,
       status: "active",
     });
   },
