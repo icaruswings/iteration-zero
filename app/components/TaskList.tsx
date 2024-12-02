@@ -10,6 +10,9 @@ interface Task {
   description: string;
   status: TaskStatus;
   priority: "High" | "Medium" | "Low";
+  createdAt?: string;
+  completedAt?: string;
+  likelyCaseEstimate: number;
 }
 
 interface Column {
@@ -21,6 +24,24 @@ interface TaskListProps {
   tasks: Task[];
   columns: Record<string, Column>;
   onStatusUpdate: (taskId: Id<"tasks">, newStatus: TaskStatus) => void;
+}
+
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function getDaysDifference(startDate?: string, endDate?: string): number {
+  if (!startDate) return 0;
+  const start = new Date(startDate);
+  const end = endDate ? new Date(endDate) : new Date();
+  const diffTime = Math.abs(end.getTime() - start.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 export default function TaskList({ tasks: serverTasks, columns, onStatusUpdate }: TaskListProps) {
@@ -90,7 +111,7 @@ export default function TaskList({ tasks: serverTasks, columns, onStatusUpdate }
                         >
                           <h3 className="font-medium dark:text-gray-100">{task.title}</h3>
                           <p className="text-sm text-gray-600 dark:text-gray-300">{task.description}</p>
-                          <div className="mt-2 text-sm">
+                          <div className="mt-2 flex flex-wrap gap-2 items-center text-xs">
                             <span className={`px-2 py-1 rounded ${
                               task.priority === "High" 
                                 ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
@@ -100,6 +121,24 @@ export default function TaskList({ tasks: serverTasks, columns, onStatusUpdate }
                             }`}>
                               {task.priority}
                             </span>
+                            {task.createdAt && (
+                              <span className="text-gray-500 dark:text-gray-400">
+                                Created: {formatDate(task.createdAt)}
+                              </span>
+                            )}
+                            {task.status === "completed" ? (
+                              <span className="text-gray-500 dark:text-gray-400">
+                                Completed in {getDaysDifference(task.createdAt, task.completedAt)} days
+                              </span>
+                            ) : task.status === "in_progress" ? (
+                              <span className="text-gray-500 dark:text-gray-400">
+                                {getDaysDifference(task.createdAt)} days in progress
+                              </span>
+                            ) : (
+                              <span className="text-gray-500 dark:text-gray-400">
+                                Est. {task.likelyCaseEstimate} days
+                              </span>
+                            )}
                           </div>
                         </div>
                       )}

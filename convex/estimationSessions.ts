@@ -76,7 +76,7 @@ export const join = mutation({
 export const selectTask = mutation({
   args: {
     sessionId: v.id("estimationSessions"),
-    taskId: v.id("tasks"),
+    taskId: v.union(v.id("tasks"), v.null()),
     managerId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -86,11 +86,12 @@ export const selectTask = mutation({
     }
 
     if (session.managerId !== args.managerId) {
-      throw new Error("Only the session manager can select tasks");
+      throw new Error("Only the manager can select tasks");
     }
 
     return await ctx.db.patch(args.sessionId, {
-      taskId: args.taskId,
+      taskId: args.taskId ?? null,
+      status: "active",
     });
   },
 });
@@ -151,6 +152,28 @@ export const submitEstimate = mutation({
 export const lockEstimates = mutation({
   args: {
     sessionId: v.id("estimationSessions"),
+    managerId: v.string(),
+  },
+  handler: async (ctx, args) => { 
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    if (session.managerId !== args.managerId) {
+      throw new Error("Only the session manager can lock estimates");
+    }
+
+    // Lock the session
+    return await ctx.db.patch(args.sessionId, {
+      status: "locked",
+    });
+  },
+});
+
+export const saveFinalEstimates = mutation({
+  args: {
+    sessionId: v.id("estimationSessions"),
     taskId: v.id("tasks"),
     managerId: v.string(),
     bestCase: v.number(),
@@ -164,7 +187,7 @@ export const lockEstimates = mutation({
     }
 
     if (session.managerId !== args.managerId) {
-      throw new Error("Only the session manager can lock estimates");
+      throw new Error("Only the session manager can save final estimates");
     }
 
     // Update task with final estimates
@@ -173,10 +196,27 @@ export const lockEstimates = mutation({
       likelyCaseEstimate: args.likelyCase,
       worstCaseEstimate: args.worstCase,
     });
+  },
+});
 
-    // Lock the session
-    return await ctx.db.patch(args.sessionId, {
-      status: "locked",
+export const unlockEstimates = mutation({
+  args: {
+    sessionId: v.id("estimationSessions"),
+    managerId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    if (session.managerId !== args.managerId) {
+      throw new Error("Only the session manager can unlock estimates");
+    }
+
+    await ctx.db.patch(args.sessionId, {
+      status: "active",
     });
   },
 });
@@ -206,5 +246,36 @@ export const getEstimates = query({
         )
       )
       .collect();
+  },
+});
+
+export const getAllTaskEstimates = query({
+  args: { 
+    iterationId: v.id("iterations"),
+  },
+  handler: async (ctx, args) => {
+    // Get all estimation sessions for this iteration
+    const sessions = await ctx.db
+      .query("estimationSessions")
+      .filter((q) => q.eq(q.field("iterationId"), args.iterationId))
+      .collect();
+
+    if (sessions.length === 0) {
+      return [];
+    }
+
+    // Get all estimates from these sessions
+    const estimates = await ctx.db
+      .query("estimates")
+      .filter((q) => 
+        q.or(
+          ...sessions.map(session => 
+            q.eq(q.field("sessionId"), session._id)
+          )
+        )
+      )
+      .collect();
+
+    return estimates;
   },
 });

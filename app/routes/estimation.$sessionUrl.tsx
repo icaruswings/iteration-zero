@@ -9,6 +9,7 @@ export default function EstimationSession() {
   const [participantId, setParticipantId] = useState("");
   const [participantName, setParticipantName] = useState("");
   const [showNamePrompt, setShowNamePrompt] = useState(true);
+  const [estimationFilter, setEstimationFilter] = useState("all");
   const [estimates, setEstimates] = useState({
     bestCase: 0,
     likelyCase: 0,
@@ -35,9 +36,16 @@ export default function EstimationSession() {
     session?.taskId ? { sessionId: session._id, taskId: session.taskId } : "skip"
   );
 
+  const allTaskEstimates = useQuery(
+    api.estimationSessions.getAllTaskEstimates,
+    session?.iterationId ? { iterationId: session.iterationId } : "skip"
+  );
+
   const joinSession = useMutation(api.estimationSessions.join);
   const submitEstimate = useMutation(api.estimationSessions.submitEstimate);
   const lockEstimates = useMutation(api.estimationSessions.lockEstimates);
+  const unlockEstimates = useMutation(api.estimationSessions.unlockEstimates);
+  const saveFinalEstimates = useMutation(api.estimationSessions.saveFinalEstimates);
   const selectTask = useMutation(api.estimationSessions.selectTask);
 
   // Initialize client-side state from sessionStorage
@@ -149,7 +157,7 @@ export default function EstimationSession() {
                 }`}
               >
                 <div className="flex items-center gap-1">
-                  {p.name}
+                  {p.participantId === participantId ? "Me" : p.name}
                   {p.participantId === session.managerId && (
                     <span className={`ml-1 ${
                       hasSubmitted
@@ -181,7 +189,18 @@ export default function EstimationSession() {
 
       {isManager && !task && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Select a Task to Estimate</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Select a Task to Estimate</h2>
+            <select
+              value={estimationFilter}
+              onChange={(e) => setEstimationFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+            >
+              <option value="all">All Tasks</option>
+              <option value="estimated">Estimated Tasks</option>
+              <option value="not-estimated">Not Estimated Tasks</option>
+            </select>
+          </div>
           {!availableTasks ? (
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
@@ -193,31 +212,38 @@ export default function EstimationSession() {
             </div>
           ) : (
             <div className="grid gap-4">
-              {availableTasks.map((t) => (
-                <button
-                  key={t._id}
-                  onClick={() => selectTask({
-                    sessionId: session._id,
-                    taskId: t._id,
-                    managerId: participantId,
-                  })}
-                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
-                >
-                  <h3 className="font-medium text-gray-800 dark:text-gray-100">{t.title}</h3>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{t.description}</p>
-                  <div className="mt-2">
-                    <span className={`inline-block px-2 py-1 text-sm rounded ${
-                      t.priority === "high" 
-                        ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100"
-                        : t.priority === "medium"
-                        ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
-                        : "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
-                    }`}>
-                      {t.priority}
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {availableTasks
+                .filter(t => {
+                  const hasEstimates = allTaskEstimates?.some(e => e.taskId === t._id);
+                  if (estimationFilter === "estimated") return hasEstimates;
+                  if (estimationFilter === "not-estimated") return !hasEstimates;
+                  return true;
+                })
+                .map((t) => (
+                  <button
+                    key={t._id}
+                    onClick={() => selectTask({
+                      sessionId: session._id,
+                      taskId: t._id,
+                      managerId: participantId,
+                    })}
+                    className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-md transition-shadow text-left"
+                  >
+                    <h3 className="font-medium text-gray-800 dark:text-gray-100">{t.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{t.description}</p>
+                    <div className="mt-2">
+                      <span className={`inline-block px-2 py-1 text-sm rounded ${
+                        t.priority === "high" 
+                          ? "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100"
+                          : t.priority === "medium"
+                          ? "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100"
+                          : "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100"
+                      }`}>
+                        {t.priority}
+                      </span>
+                    </div>
+                  </button>
+                ))}
             </div>
           )}
         </div>
@@ -225,7 +251,79 @@ export default function EstimationSession() {
 
       {task ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Current Task</h2>
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-100">Current Task</h2>
+            {isManager && (
+              <div className="relative">
+                <button
+                  onClick={async () => {
+                    if (session.status === "active" && allEstimates && allEstimates.length > 0) {
+                      // Calculate averages
+                      const avgEstimates = allEstimates.reduce(
+                        (acc, curr) => ({
+                          bestCase: acc.bestCase + curr.bestCase,
+                          likelyCase: acc.likelyCase + curr.likelyCase,
+                          worstCase: acc.worstCase + curr.worstCase,
+                        }),
+                        { bestCase: 0, likelyCase: 0, worstCase: 0 }
+                      );
+                      
+                      const count = allEstimates.length;
+                      const finalEstimates = {
+                        bestCase: Math.round(avgEstimates.bestCase / count * 10) / 10,
+                        likelyCase: Math.round(avgEstimates.likelyCase / count * 10) / 10,
+                        worstCase: Math.round(avgEstimates.worstCase / count * 10) / 10,
+                      };
+
+                      // Save final estimates
+                      await saveFinalEstimates({
+                        sessionId: session._id,
+                        taskId: task._id,
+                        managerId: participantId,
+                        ...finalEstimates,
+                      });
+
+                      // Lock the session
+                      await lockEstimates({
+                        sessionId: session._id,
+                        managerId: participantId,
+                      });
+                        
+                    } else if (session.status === "locked") {
+                      await unlockEstimates({
+                        sessionId: session._id,
+                        managerId: participantId,
+                      });
+                    }
+                  }}
+                  className={`p-2 rounded-md text-sm font-medium ${
+                    session.status === "active"
+                      ? allEstimates && allEstimates.length > 0
+                        ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                        : "bg-yellow-300 cursor-not-allowed text-white"
+                      : "bg-green-500 hover:bg-green-600 text-white"
+                  }`}
+                  disabled={session.status === "active" && (!allEstimates || allEstimates.length === 0)}
+                >
+                  {session.status === "active" ? (
+                    allEstimates && allEstimates.length > 0 ? (
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                      </svg>
+                    )
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
           <div className="mb-4">
             <h3 className="font-medium text-gray-800 dark:text-gray-100">{task.title}</h3>
             <p className="text-gray-600 dark:text-gray-400">{task.description}</p>
@@ -233,76 +331,107 @@ export default function EstimationSession() {
 
           {session.status === "active" && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Best (days)
-                  </label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={estimates.bestCase || currentEstimate?.bestCase || 0}
-                    onChange={(e) =>
-                      setEstimates((prev) => ({
-                        ...prev,
-                        bestCase: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
-                  />
+              {isManager ? (
+                <div className="grid grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Best (days)
+                    </label>
+                    <div className="block w-full text-center text-2xl font-medium h-16 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 flex items-center justify-center">
+                      {averageEstimates?.bestCase || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Likely (days)
+                    </label>
+                    <div className="block w-full text-center text-2xl font-medium h-16 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 flex items-center justify-center">
+                      {averageEstimates?.likelyCase || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Worst (days)
+                    </label>
+                    <div className="block w-full text-center text-2xl font-medium h-16 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 flex items-center justify-center">
+                      {averageEstimates?.worstCase || 0}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Likely (days)
-                  </label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={estimates.likelyCase || currentEstimate?.likelyCase || 0}
-                    onChange={(e) =>
-                      setEstimates((prev) => ({
-                        ...prev,
-                        likelyCase: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
-                  />
+              ) : (
+                <div className="grid grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Best (days)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={estimates.bestCase || currentEstimate?.bestCase || 0}
+                      onChange={(e) =>
+                        setEstimates((prev) => ({
+                          ...prev,
+                          bestCase: parseFloat(e.target.value),
+                        }))
+                      }
+                      className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Likely (days)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={estimates.likelyCase || currentEstimate?.likelyCase || 0}
+                      onChange={(e) =>
+                        setEstimates((prev) => ({
+                          ...prev,
+                          likelyCase: parseFloat(e.target.value),
+                        }))
+                      }
+                      className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Worst (days)
+                    </label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={estimates.worstCase || currentEstimate?.worstCase || 0}
+                      onChange={(e) =>
+                        setEstimates((prev) => ({
+                          ...prev,
+                          worstCase: parseFloat(e.target.value),
+                        }))
+                      }
+                      className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Worst (days)
-                  </label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={estimates.worstCase || currentEstimate?.worstCase || 0}
-                    onChange={(e) =>
-                      setEstimates((prev) => ({
-                        ...prev,
-                        worstCase: parseFloat(e.target.value),
-                      }))
-                    }
-                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
-                  />
-                </div>
-              </div>
+              )}
 
-              <button
-                onClick={() =>
-                  submitEstimate({
-                    sessionId: session._id,
-                    taskId: task._id,
-                    participantId,
-                    ...estimates,
-                  })
-                }
-                className="mt-8 w-full bg-blue-500 text-white p-4 text-lg font-medium rounded-lg hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"
-              >
-                Submit Estimate
-              </button>
+              {!isManager && (
+                <button
+                  onClick={() =>
+                    submitEstimate({
+                      sessionId: session._id,
+                      taskId: task._id,
+                      participantId,
+                      ...estimates,
+                    })
+                  }
+                  className="mt-8 w-full bg-blue-500 text-white p-4 text-lg font-medium rounded-lg hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"
+                >
+                  Submit Estimate
+                </button>
+              )}
             </div>
           )}
 
@@ -310,82 +439,51 @@ export default function EstimationSession() {
             <div className="mt-8">
               <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">Submitted Estimates</h3>
               <div className="space-y-4">
-                {allEstimates.map((estimate) => {
-                  const participant = session.participants.find(
-                    (p) => p.participantId === estimate.participantId
-                  );
-                  return (
-                    <div
-                      key={estimate._id}
-                      className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-800 dark:text-gray-100">
-                          {participant?.name}
-                        </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(estimate._creationTime).toLocaleTimeString()}
-                        </span>
+                {allEstimates
+                  .filter(estimate => {
+                    const participant = session.participants.find(p => p.participantId === estimate.participantId);
+                    return participant?.participantId !== session.managerId;
+                  })
+                  .map((estimate) => {
+                    const participant = session.participants.find(
+                      (p) => p.participantId === estimate.participantId
+                    );
+                    return (
+                      <div
+                        key={estimate._id}
+                        className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-gray-800 dark:text-gray-100">
+                            {participant?.participantId === participantId ? "Me" : participant?.name}
+                          </span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {new Date(estimate._creationTime).toLocaleTimeString()}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Best:</span>
+                            <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.bestCase} days</span>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Likely:</span>
+                            <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.likelyCase} days</span>
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Worst:</span>
+                            <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.worstCase} days</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Best:</span>
-                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.bestCase} days</span>
-                        </div>
-                        <div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Likely:</span>
-                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.likelyCase} days</span>
-                        </div>
-                        <div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Worst:</span>
-                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.worstCase} days</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
-              
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-lg">
-                <h4 className="font-medium text-blue-800 dark:text-blue-100 mb-2">Current Average</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <span className="text-sm text-blue-600 dark:text-blue-300">Best:</span>
-                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.bestCase} days</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-blue-600 dark:text-blue-300">Likely:</span>
-                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.likelyCase} days</span>
-                  </div>
-                  <div>
-                    <span className="text-sm text-blue-600 dark:text-blue-300">Worst:</span>
-                    <span className="ml-2 text-blue-800 dark:text-blue-100">{averageEstimates?.worstCase} days</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {isManager && session.status === "active" && (
-            <div className="mt-4">
-              <button
-                onClick={() => lockEstimates({ 
-                  sessionId: session._id, 
-                  taskId: task._id, 
-                  managerId: session.managerId, 
-                  bestCase: averageEstimates?.bestCase ?? 0, 
-                  likelyCase: averageEstimates?.likelyCase ?? 0, 
-                  worstCase: averageEstimates?.worstCase ?? 0 
-                })}
-                className="w-full bg-yellow-500 text-white p-2 rounded hover:bg-yellow-600 dark:hover:bg-yellow-500"
-              >
-                Lock Estimates
-              </button>
             </div>
           )}
 
           {session.status === "locked" && allEstimates && (
-            <div className="mt-4">
+            <div className="mt-8">
               <h3 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Final Estimates</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>
@@ -407,6 +505,19 @@ export default function EstimationSession() {
                   <div className="mt-1 text-lg text-gray-800 dark:text-gray-100">{averageEstimates?.worstCase}</div>
                 </div>
               </div>
+              {isManager && (
+                <button
+                  onClick={async () => {
+                    await selectTask({
+                      sessionId: session._id,
+                      managerId: participantId,
+                    });
+                  }}
+                  className="mt-6 w-full bg-blue-500 text-white p-4 text-lg font-medium rounded-lg hover:bg-blue-600 dark:hover:bg-blue-500 transition-colors"
+                >
+                  Select Next Task
+                </button>
+              )}
             </div>
           )}
         </div>

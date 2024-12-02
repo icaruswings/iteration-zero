@@ -16,6 +16,8 @@ import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { rootAuthLoader } from "@clerk/remix/ssr.server";
 import { LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import Footer from "./components/Footer";
+import { SidebarProvider, SidebarTrigger } from "./components/ui/sidebar";
+import { AppSidebar } from "./components/AppSidebar";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: tailwind },
@@ -46,8 +48,14 @@ function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body className="min-h-full flex flex-col bg-white dark:bg-gray-900">
-        {children}
-        <Footer />
+        <SidebarProvider>
+          <AppSidebar />
+          <main>
+            <SidebarTrigger />
+            {children}
+            <Footer />
+          </main>
+        </SidebarProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
