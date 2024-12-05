@@ -68,7 +68,7 @@ export const listRecent = query({
   args: {
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { limit = 5 }) => {
+  handler: async (ctx, { limit = 200 }) => {
     return await ctx.db
       .query("tasks")
       .order("desc")
@@ -102,8 +102,8 @@ export const updateStatus = mutation({
 
     await ctx.db.patch(id, {
       status,
-      // Set completedAt to current time when completed, null when not completed
-      completedAt: status === "completed" ? now : null,
+      // Set completedAt to current time when completed, undefined when not completed
+      completedAt: status === "completed" ? now : undefined,
     });
 
     return;

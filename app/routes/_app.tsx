@@ -5,6 +5,7 @@ import { PropsWithChildren } from "react";
 import { AppSidebar } from "~/components/AppSidebar";
 import Footer from "~/components/Footer";
 import { SidebarProvider, SidebarTrigger } from "~/components/ui/sidebar";
+import ErrorBoundary from "~/components/ErrorBoundary";
 
 export const loader = async (args: LoaderFunctionArgs) => {
     const { sessionId } = await getAuth(args);
@@ -39,4 +40,6 @@ export default function () {
         <Outlet />
       </Layout>
     );
-  }
+}
+
+export { ErrorBoundary };

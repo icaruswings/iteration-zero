@@ -1,8 +1,8 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Link } from "@remix-run/react";
-import { Doc, Id } from "../../convex/_generated/dataModel";
-
+import { Doc } from "../../convex/_generated/dataModel";
+import { calculateBurndownProgress } from "../utils/burndown";
 
 type Iteration = Doc<"iterations">;
 type Task = Doc<"tasks">;
@@ -11,40 +11,8 @@ interface IterationListProps {
   iterations: Iteration[];
 }
 
-function calculateBurndownProgress(
-  startDate: string,
-  endDate: string,
-  tasks: Task[]
-) {
-  const now = Date.now();
-  const start = new Date(startDate).getTime();
-  const end = new Date(endDate).getTime();
-  const totalDuration = end - start;
-  const elapsed = now - start;
-  const timeProgress = Math.min(Math.max(0, elapsed / totalDuration), 1);
-
-  const totalEffort = tasks.reduce((sum, task) => sum + task.estimate, 0);
-  const remainingEffort = tasks
-    .filter(task => task.status !== "completed")
-    .reduce((sum, task) => sum + task.estimate, 0);
-  
-  const effortProgress = totalEffort === 0 ? 1 : (totalEffort - remainingEffort) / totalEffort;
-  
-  // If we're burning down effort faster than time is passing, we're ahead (green)
-  // If we're burning down effort at roughly the same rate as time, we're on track (blue)
-  // If we're burning down effort slower than time is passing, we're behind (yellow/red)
-  const burndownRatio = effortProgress / timeProgress;
-  
-  return {
-    progress: Math.round(effortProgress * 100),
-    status: burndownRatio >= 1.1 ? "ahead" : 
-           burndownRatio >= 0.9 ? "on-track" :
-           burndownRatio >= 0.7 ? "behind" : "at-risk"
-  };
-}
-
 export default function IterationList({ iterations }: { iterations: Iteration[] | undefined }) {
-  const allTasks: Task[] = useQuery(api.tasks.listRecent, { limit: 5 }) ?? [];
+  const allTasks: Task[] = useQuery(api.tasks.listRecent, { limit: 250 }) ?? [];
   
   if (!iterations) {
     return (
@@ -88,7 +56,7 @@ export default function IterationList({ iterations }: { iterations: Iteration[] 
       {iterations
         .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
         .map((iteration) => {
-          const iterationTasks = allTasks?.filter(task => task.iterationId === iteration._id) || [];
+          const iterationTasks = allTasks.filter(task => task.iterationId === iteration._id);
           const { progress, status } = calculateBurndownProgress(iteration.startDate, iteration.endDate, iterationTasks);
           
           return (

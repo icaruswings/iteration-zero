@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { isMonday, previousMonday, addDays, subDays, addWeeks, format } from "date-fns";
 
 type SeedData = {
   iterations: {
@@ -22,31 +23,46 @@ type SeedData = {
   }[];
 };
 
+// Get the start date of the current iteration (previous Monday)
+const currentIterationStart = previousMonday(new Date());
+const currentIterationEnd = addDays(currentIterationStart, 13); // 2 weeks - 1 day
+
+// Calculate previous iteration dates
+const previousIterationStart = subDays(currentIterationStart, 14);
+const previousIterationEnd = subDays(currentIterationStart, 1);
+
+// Calculate next iteration dates
+const nextIterationStart = addDays(currentIterationEnd, 1);
+const nextIterationEnd = addDays(nextIterationStart, 13);
+
+// Format dates to ISO string (YYYY-MM-DD)
+const formatDate = (date: Date) => format(date, 'yyyy-MM-dd');
+
 const seedData: SeedData = {
   iterations: [
     {
-      name: "Sprint 1",
-      startDate: "2024-01-01",
-      endDate: "2024-01-14",
+      name: "Previous Sprint",
+      startDate: formatDate(previousIterationStart),
+      endDate: formatDate(previousIterationEnd),
       description: "Initial sprint focusing on core features",
       status: "completed",
-      createdAt: "2024-01-01",
+      createdAt: formatDate(previousIterationStart),
     },
     {
-      name: "Sprint 2",
-      startDate: "2024-01-15",
-      endDate: "2024-01-28",
+      name: "Current Sprint",
+      startDate: formatDate(currentIterationStart),
+      endDate: formatDate(currentIterationEnd),
       description: "Implementing user feedback and bug fixes",
       status: "active",
-      createdAt: "2024-01-15",
+      createdAt: formatDate(currentIterationStart),
     },
     {
-      name: "Sprint 3",
-      startDate: "2024-01-29",
-      endDate: "2024-02-11",
+      name: "Next Sprint",
+      startDate: formatDate(nextIterationStart),
+      endDate: formatDate(nextIterationEnd),
       description: "New feature development sprint",
       status: "pending",
-      createdAt: "2024-01-29",
+      createdAt: formatDate(nextIterationStart),
     },
   ],
   tasks: [
@@ -56,8 +72,8 @@ const seedData: SeedData = {
       priority: "High",
       status: "completed",
       estimate: 3,
-      createdAt: "2024-01-01",
-      completedAt: "2024-01-03",
+      createdAt: formatDate(previousIterationStart),
+      completedAt: formatDate(addDays(previousIterationStart, 2)),
       sprintIndex: 0,
     },
     {
@@ -66,8 +82,8 @@ const seedData: SeedData = {
       priority: "Medium",
       status: "completed",
       estimate: 5,
-      createdAt: "2024-01-02",
-      completedAt: "2024-01-06",
+      createdAt: formatDate(addDays(previousIterationStart, 1)),
+      completedAt: formatDate(addDays(previousIterationStart, 5)),
       sprintIndex: 0,
     },
     {
@@ -76,8 +92,8 @@ const seedData: SeedData = {
       priority: "High",
       status: "completed",
       estimate: 2,
-      createdAt: "2024-01-03",
-      completedAt: "2024-01-04",
+      createdAt: formatDate(addDays(previousIterationStart, 2)),
+      completedAt: formatDate(addDays(previousIterationStart, 3)),
       sprintIndex: 0,
     },
     {
@@ -86,7 +102,7 @@ const seedData: SeedData = {
       priority: "Medium",
       status: "in_progress",
       estimate: 4,
-      createdAt: "2024-01-15",
+      createdAt: formatDate(currentIterationStart),
       sprintIndex: 1,
     },
     {
@@ -95,18 +111,18 @@ const seedData: SeedData = {
       priority: "Low",
       status: "completed",
       estimate: 3,
-      createdAt: "2024-01-04",
-      completedAt: "2024-01-06",
+      createdAt: formatDate(addDays(previousIterationStart, 3)),
+      completedAt: formatDate(addDays(previousIterationStart, 5)),
       sprintIndex: 0,
     },
     {
       title: "API Rate Limiting",
       description: "Implement rate limiting for API endpoints",
-      priority: "High",
+      priority: "Medium",
       status: "completed",
       estimate: 2,
-      createdAt: "2024-01-05",
-      completedAt: "2024-01-06",
+      createdAt: formatDate(addDays(previousIterationStart, 4)),
+      completedAt: formatDate(addDays(previousIterationStart, 5)),
       sprintIndex: 0,
     },
     {
@@ -115,17 +131,17 @@ const seedData: SeedData = {
       priority: "High",
       status: "completed",
       estimate: 3,
-      createdAt: "2024-01-08",
-      completedAt: "2024-01-10",
+      createdAt: formatDate(addDays(previousIterationStart, 7)),
+      completedAt: formatDate(addDays(previousIterationStart, 9)),
       sprintIndex: 0,
     },
     {
       title: "Performance Optimization",
       description: "Optimize front-end performance and loading times",
-      priority: "Medium",
+      priority: "High",
       status: "in_progress",
       estimate: 5,
-      createdAt: "2024-01-16",
+      createdAt: formatDate(addDays(currentIterationStart, 1)),
       sprintIndex: 1,
     },
     {
@@ -134,7 +150,7 @@ const seedData: SeedData = {
       priority: "Medium",
       status: "pending",
       estimate: 4,
-      createdAt: "2024-01-29",
+      createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
     {
@@ -143,7 +159,7 @@ const seedData: SeedData = {
       priority: "Low",
       status: "pending",
       estimate: 3,
-      createdAt: "2024-01-29",
+      createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
     {
@@ -152,7 +168,7 @@ const seedData: SeedData = {
       priority: "High",
       status: "in_progress",
       estimate: 4,
-      createdAt: "2024-01-17",
+      createdAt: formatDate(addDays(currentIterationStart, 2)),
       sprintIndex: 1,
     },
     {
@@ -161,7 +177,7 @@ const seedData: SeedData = {
       priority: "Medium",
       status: "pending",
       estimate: 5,
-      createdAt: "2024-01-29",
+      createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
     {
@@ -170,7 +186,7 @@ const seedData: SeedData = {
       priority: "Low",
       status: "pending",
       estimate: 3,
-      createdAt: "2024-01-29",
+      createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
     {
@@ -179,7 +195,7 @@ const seedData: SeedData = {
       priority: "High",
       status: "pending",
       estimate: 4,
-      createdAt: "2024-01-30",
+      createdAt: formatDate(addDays(nextIterationStart, 1)),
       sprintIndex: 2,
     },
     {
@@ -188,25 +204,25 @@ const seedData: SeedData = {
       priority: "Medium",
       status: "pending",
       estimate: 4,
-      createdAt: "2024-01-30",
+      createdAt: formatDate(addDays(nextIterationStart, 1)),
       sprintIndex: 2,
     },
     {
       title: "Burndown Chart",
       description: "Create burndown chart visualization",
-      priority: "Medium",
+      priority: "High",
       status: "in_progress",
       estimate: 3,
-      createdAt: "2024-01-16",
+      createdAt: formatDate(addDays(currentIterationStart, 1)),
       sprintIndex: 1,
     },
     {
       title: "Estimation Sessions",
       description: "Implement real-time estimation sessions",
-      priority: "High",
+      priority: "Medium",
       status: "pending",
       estimate: 5,
-      createdAt: "2024-01-16",
+      createdAt: formatDate(addDays(currentIterationStart, 1)),
       sprintIndex: 1,
     },
   ],

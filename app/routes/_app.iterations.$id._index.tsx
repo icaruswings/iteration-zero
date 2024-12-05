@@ -7,8 +7,6 @@ import BurndownChart from "~/components/BurndownChart";
 import TaskList from "~/components/TaskList";
 import { api } from "convex/_generated/api";
 import { Id } from "convex/_generated/dataModel";
-import { nanoid } from "nanoid";
-import { createEstimationSession } from "~/utils/estimation";
 import { useAuth } from "@clerk/remix";
 
 export default function IterationDetails() {

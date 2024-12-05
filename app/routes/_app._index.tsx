@@ -13,7 +13,7 @@ export const meta: MetaFunction = () => {
 
 export default function Dashboard() {
   const activeIterations = useQuery(api.iterations.list);
-  const recentTasks = useQuery(api.tasks.listRecent, {});
+  const recentTasks = useQuery(api.tasks.listRecent, { limit: 5 });
   const seedData = useMutation(api.seed.seed);
 
   const handleSeed = async () => {
