@@ -1,7 +1,8 @@
 import type { MetaFunction } from "@remix-run/node";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Link } from "@remix-run/react";
+import { Button } from "~/components/ui/button";
 
 export const meta: MetaFunction = () => {
   return [
@@ -11,18 +12,37 @@ export const meta: MetaFunction = () => {
 };
 
 export default function Dashboard() {
-  const activeIterations = useQuery(api.iterations.list, { status: "active" });
-  const recentTasks = useQuery(api.tasks.listRecent);
+  const activeIterations = useQuery(api.iterations.list);
+  const recentTasks = useQuery(api.tasks.listRecent, {});
+  const seedData = useMutation(api.seed.seed);
+
+  const handleSeed = async () => {
+    try {
+      await seedData();
+      window.location.reload(); // Refresh to see the new data
+    } catch (error) {
+      console.error('Error seeding data:', error);
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
-          Dashboard
-        </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-300">
-          Overview of your development progress
-        </p>
+      <header className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
+            Dashboard
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-300">
+            Overview of your development progress
+          </p>
+        </div>
+        <Button 
+          onClick={handleSeed}
+          variant="outline"
+          size="sm"
+        >
+          Seed Demo Data
+        </Button>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -80,7 +100,7 @@ export default function Dashboard() {
                     {task.status}
                   </span>
                   <span className="text-gray-600 dark:text-gray-300">
-                    Est. {task.likelyCaseEstimate} days
+                    Est. {task.estimate} days
                   </span>
                 </div>
               </div>

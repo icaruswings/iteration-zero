@@ -15,6 +15,7 @@ import type {
 } from "convex/server";
 import type * as estimationSessions from "../estimationSessions.js";
 import type * as iterations from "../iterations.js";
+import type * as seed from "../seed.js";
 import type * as tasks from "../tasks.js";
 
 /**
@@ -28,6 +29,7 @@ import type * as tasks from "../tasks.js";
 declare const fullApi: ApiFromModules<{
   estimationSessions: typeof estimationSessions;
   iterations: typeof iterations;
+  seed: typeof seed;
   tasks: typeof tasks;
 }>;
 export declare const api: FilterApi<

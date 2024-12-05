@@ -7,51 +7,42 @@ export default defineSchema({
     startDate: v.string(),
     endDate: v.string(),
     status: v.string(),
-    goals: v.array(v.string()),
     description: v.string(),
-  }),
+    createdAt: v.string(),
+    createdBy: v.string(), // Clerk user ID
+  }).index("by_creator", ["createdBy"]),
 
   tasks: defineTable({
     iterationId: v.id("iterations"),
     title: v.string(),
     description: v.string(),
     status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
-    assignee: v.optional(v.string()),
     priority: v.union(v.literal("High"), v.literal("Medium"), v.literal("Low")),
-    bestCaseEstimate: v.number(), // in days
-    likelyCaseEstimate: v.number(), // in days
-    worstCaseEstimate: v.number(), // in days
-    statusHistory: v.optional(v.array(v.object({
-      status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
-      timestamp: v.string(),
-    }))),
-    createdAt: v.optional(v.string()),
-    completedAt: v.optional(v.string()), // Date when task was marked as completed
+    estimate: v.optional(v.number()),
+    createdAt: v.string(),
+    createdBy: v.string(), // Clerk user ID
+    completedAt: v.optional(v.string()),
   }).index("by_iteration", ["iterationId"]),
 
   estimationSessions: defineTable({
     iterationId: v.id("iterations"),
-    taskId: v.optional(v.id("tasks")),
-    sessionUrl: v.string(),
-    status: v.union(v.literal("active"), v.literal("locked")),
-    managerId: v.string(),
+    currentTaskId: v.optional(v.id("tasks")), // current task being estimated
+    currentTaskStatus: v.union(v.literal("waiting"), v.literal("active"), v.literal("locked")),
+    createdBy: v.string(), // Clerk user ID
     createdAt: v.string(),
     participants: v.array(v.object({
-      participantId: v.string(),
+      userId: v.string(), // Clerk user ID
       name: v.string(),
-      email: v.optional(v.string()),
-      imageUrl: v.optional(v.string()),
+      joinedAt: v.string(),
     })),
   }).index("by_iteration", ["iterationId"]),
 
   estimates: defineTable({
     sessionId: v.id("estimationSessions"),
     taskId: v.id("tasks"),
-    participantId: v.string(),
-    bestCase: v.number(),
-    likelyCase: v.number(),
-    worstCase: v.number(),
+    participantId: v.string(), // Clerk user ID
+    estimate: v.number(),
     createdAt: v.string(),
-    updatedAt: v.string(),
-  }).index("by_session_task", ["sessionId", "taskId"]),
+  }).index("by_task", ["taskId"])
+  .index("by_session_task", ["sessionId", "taskId"])
 });

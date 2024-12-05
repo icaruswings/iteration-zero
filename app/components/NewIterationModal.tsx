@@ -9,7 +9,6 @@ interface NewIterationModalProps {
 
 export default function NewIterationModal({ isOpen, onClose }: NewIterationModalProps) {
   const createIteration = useMutation(api.iterations.create);
-  const [goals, setGoals] = useState<string[]>([""]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -20,24 +19,10 @@ export default function NewIterationModal({ isOpen, onClose }: NewIterationModal
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const filteredGoals = goals.filter((goal) => goal.trim() !== "");
-    
-    await createIteration({
-      ...formData,
-      goals: filteredGoals,
-    });
-    
+  
+    await createIteration(formData);
+
     onClose();
-  };
-
-  const addGoal = () => {
-    setGoals([...goals, ""]);
-  };
-
-  const updateGoal = (index: number, value: string) => {
-    const newGoals = [...goals];
-    newGoals[index] = value;
-    setGoals(newGoals);
   };
 
   if (!isOpen) return null;
@@ -100,30 +85,6 @@ export default function NewIterationModal({ isOpen, onClose }: NewIterationModal
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
-          </div>
-
-          <div className="mb-4">
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Goals
-            </label>
-            {goals.map((goal, index) => (
-              <div key={index} className="mb-2">
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
-                  value={goal}
-                  onChange={(e) => updateGoal(index, e.target.value)}
-                  placeholder={`Goal ${index + 1}`}
-                />
-              </div>
-            ))}
-            <button
-              type="button"
-              onClick={addGoal}
-              className="mt-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-            >
-              + Add Goal
-            </button>
           </div>
 
           <div className="flex justify-end gap-4">

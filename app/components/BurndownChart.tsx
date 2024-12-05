@@ -12,7 +12,7 @@ import {
   Legend,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 ChartJS.register(
   CategoryScale,
@@ -40,7 +40,7 @@ export default function BurndownChart({ iterationId }: BurndownChartProps) {
   };
 
   const iteration = useQuery(api.iterations.get, { id: iterationId });
-  const tasks = useQuery(api.tasks.listByIteration, { iterationId });
+  const tasks = useQuery(api.tasks.list, { iterationId });
 
   if (!iteration || !tasks) return null;
 
@@ -48,12 +48,8 @@ export default function BurndownChart({ iterationId }: BurndownChartProps) {
   const endDate = new Date(iteration.endDate);
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Calculate total effort for each scenario
-  const totalEffort = {
-    best: tasks.reduce((sum, task) => sum + task.bestCaseEstimate, 0),
-    likely: tasks.reduce((sum, task) => sum + task.likelyCaseEstimate, 0),
-    worst: tasks.reduce((sum, task) => sum + task.worstCaseEstimate, 0),
-  };
+  // Calculate total effort
+  const totalEffort = tasks.reduce((sum, task) => sum + (task.estimate || 0), 0);
 
   // Generate dates array
   const dates = Array.from({ length: totalDays + 1 }, (_, i) => {
@@ -62,90 +58,36 @@ export default function BurndownChart({ iterationId }: BurndownChartProps) {
     return date.toISOString().split('T')[0];
   });
 
-  // Calculate ideal burndown lines
-  const idealBurndown = {
-    best: dates.map((_, i) => totalEffort.best * (1 - i / totalDays)),
-    likely: dates.map((_, i) => totalEffort.likely * (1 - i / totalDays)),
-    worst: dates.map((_, i) => totalEffort.worst * (1 - i / totalDays)),
-  };
+  // Calculate ideal burndown line
+  const idealBurndown = dates.map((_, i) => totalEffort * (1 - i / totalDays));
 
-  // Calculate actual burndown lines for each estimate type
+  // Calculate actual burndown line
   const today = new Date().toISOString().split('T')[0];
-  const actualBurndown = {
-    best: dates.map(date => {
-      if (date > today) return null;
-      const completedTasks = tasks.filter(task => 
-        task.status === "completed" && 
-        task.completedAt && 
-        task.completedAt.split('T')[0] <= date
-      );
-      const completedEffort = completedTasks.reduce((sum, task) => sum + task.bestCaseEstimate, 0);
-      return totalEffort.best - completedEffort;
-    }),
-    likely: dates.map(date => {
-      if (date > today) return null;
-      const completedTasks = tasks.filter(task => 
-        task.status === "completed" && 
-        task.completedAt && 
-        task.completedAt.split('T')[0] <= date
-      );
-      const completedEffort = completedTasks.reduce((sum, task) => sum + task.likelyCaseEstimate, 0);
-      return totalEffort.likely - completedEffort;
-    }),
-    worst: dates.map(date => {
-      if (date > today) return null;
-      const completedTasks = tasks.filter(task => 
-        task.status === "completed" && 
-        task.completedAt && 
-        task.completedAt.split('T')[0] <= date
-      );
-      const completedEffort = completedTasks.reduce((sum, task) => sum + task.worstCaseEstimate, 0);
-      return totalEffort.worst - completedEffort;
-    }),
-  };
+  const actualBurndown = dates.map(date => {
+    if (date > today) return null;
+    const completedTasks = tasks.filter(task => 
+      task.status === "completed" && 
+      task.completedAt && 
+      task.completedAt.split('T')[0] <= date
+    );
+    const completedEffort = completedTasks.reduce((sum, task) => sum + (task.estimate || 0), 0);
+    return totalEffort - completedEffort;
+  });
 
   const data = {
     labels: dates.map(d => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })),
     datasets: [
       {
-        label: "Best Case (Estimated)",
-        data: idealBurndown.best,
-        borderColor: "rgba(75, 192, 192, 0.5)",
-        backgroundColor: "transparent",
-        borderDash: [5, 5],
-      },
-      {
-        label: "Likely Case (Estimated)",
-        data: idealBurndown.likely,
+        label: "Estimated Progress",
+        data: idealBurndown,
         borderColor: "rgba(54, 162, 235, 0.5)",
         backgroundColor: "transparent",
         borderDash: [5, 5],
       },
       {
-        label: "Worst Case (Estimated)",
-        data: idealBurndown.worst,
-        borderColor: "rgba(255, 99, 132, 0.5)",
-        backgroundColor: "transparent",
-        borderDash: [5, 5],
-      },
-      {
-        label: "Best Case (Actual)",
-        data: actualBurndown.best,
-        borderColor: "rgb(75, 192, 192)",
-        backgroundColor: "transparent",
-        borderWidth: 2,
-      },
-      {
-        label: "Likely Case (Actual)",
-        data: actualBurndown.likely,
+        label: "Actual Progress",
+        data: actualBurndown,
         borderColor: "rgb(54, 162, 235)",
-        backgroundColor: "transparent",
-        borderWidth: 2,
-      },
-      {
-        label: "Worst Case (Actual)",
-        data: actualBurndown.worst,
-        borderColor: "rgb(255, 99, 132)",
         backgroundColor: "transparent",
         borderWidth: 2,
       },
@@ -158,7 +100,8 @@ export default function BurndownChart({ iterationId }: BurndownChartProps) {
     aspectRatio: 2,
     plugins: {
       legend: {
-        display: false,
+        display: true,
+        position: 'top' as const,
       },
       title: {
         display: false,
@@ -197,44 +140,9 @@ export default function BurndownChart({ iterationId }: BurndownChartProps) {
             <span className="font-medium">How to read this chart:</span> The burndown chart shows the remaining effort over time.
           </p>
           <ul className="list-disc list-inside space-y-1">
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t border-[rgba(75,192,192,0.5)] border-dashed"></span>
-                Best case estimate
-              </span>
-            </li>
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t border-[rgba(54,162,235,0.5)] border-dashed"></span>
-                Likely case estimate
-              </span>
-            </li>
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t border-[rgba(255,99,132,0.5)] border-dashed"></span>
-                Worst case estimate
-              </span>
-            </li>
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t-2 border-[rgb(75,192,192)]"></span>
-                Best case actual
-              </span>
-            </li>
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t-2 border-[rgb(54,162,235)]"></span>
-                Likely case actual
-              </span>
-            </li>
-            <li>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-3 border-t-2 border-[rgb(255,99,132)]"></span>
-                Worst case actual
-              </span>
-            </li>
-            <li>If the actual lines are below their respective estimates, you're ahead of schedule</li>
-            <li>If the actual lines are above their respective estimates, you're behind schedule</li>
+            <li>The dashed line shows the ideal progress</li>
+            <li>The solid line shows your actual progress</li>
+            <li>Steeper slopes indicate faster progress</li>
           </ul>
         </div>
       )}

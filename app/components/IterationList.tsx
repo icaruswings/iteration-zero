@@ -1,24 +1,11 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Link } from "@remix-run/react";
-import { Id } from "../../convex/_generated/dataModel";
+import { Doc, Id } from "../../convex/_generated/dataModel";
 
-interface Iteration {
-  _id: Id<"iterations">;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  description: string;
-}
 
-interface Task {
-  _id: Id<"tasks">;
-  iterationId: Id<"iterations">;
-  status: string;
-  worstCaseEstimate: number;
-  statusHistory?: { status: "completed" | "pending" | "in_progress"; timestamp: string; }[];
-}
+type Iteration = Doc<"iterations">;
+type Task = Doc<"tasks">;
 
 interface IterationListProps {
   iterations: Iteration[];
@@ -36,10 +23,10 @@ function calculateBurndownProgress(
   const elapsed = now - start;
   const timeProgress = Math.min(Math.max(0, elapsed / totalDuration), 1);
 
-  const totalEffort = tasks.reduce((sum, task) => sum + task.worstCaseEstimate, 0);
+  const totalEffort = tasks.reduce((sum, task) => sum + task.estimate, 0);
   const remainingEffort = tasks
     .filter(task => task.status !== "completed")
-    .reduce((sum, task) => sum + task.worstCaseEstimate, 0);
+    .reduce((sum, task) => sum + task.estimate, 0);
   
   const effortProgress = totalEffort === 0 ? 1 : (totalEffort - remainingEffort) / totalEffort;
   
@@ -57,7 +44,7 @@ function calculateBurndownProgress(
 }
 
 export default function IterationList({ iterations }: { iterations: Iteration[] | undefined }) {
-  const allTasks: Task[] = useQuery(api.tasks.listRecent) ?? [];
+  const allTasks: Task[] = useQuery(api.tasks.listRecent, { limit: 5 }) ?? [];
   
   if (!iterations) {
     return (

@@ -4,8 +4,6 @@ import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import NewIterationModal from "../components/NewIterationModal";
 import IterationList from "../components/IterationList";
-import { Link } from "@remix-run/react";
-import Timeline from "~/components/Timeline";
 
 export const meta: MetaFunction = () => {
   return [
@@ -15,7 +13,7 @@ export const meta: MetaFunction = () => {
 };
 
 export default function Iterations() {
-  const iterations = useQuery(api.iterations.list, { status: "active" });
+  const iterations = useQuery(api.iterations.list);
   const [isNewIterationModalOpen, setIsNewIterationModalOpen] = useState(false);
 
   return (

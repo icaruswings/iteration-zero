@@ -1,4 +1,4 @@
-import { useParams } from "@remix-run/react";
+import { useNavigate, useParams } from "@remix-run/react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import NewTaskModal from "../components/NewTaskModal";
@@ -9,14 +9,20 @@ import { api } from "convex/_generated/api";
 import { Id } from "convex/_generated/dataModel";
 import { nanoid } from "nanoid";
 import { createEstimationSession } from "~/utils/estimation";
+import { useAuth } from "@clerk/remix";
 
 export default function IterationDetails() {
   const { id } = useParams();
-  const convex = useConvex();
   const iterationId = id as Id<"iterations">;
+
+  const navigate = useNavigate();
+  const convex = useConvex();
+  const { userId  } = useAuth();
+
   const iteration = useQuery(api.iterations.get, { id: iterationId });
-  const tasks = useQuery(api.tasks.listByIteration, { iterationId });
+  const tasks = useQuery(api.tasks.list, { iterationId });
   const updateStatus = useMutation(api.tasks.updateStatus);
+
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -34,6 +40,14 @@ export default function IterationDetails() {
       status: "completed" as const,
     },
   });
+
+  const startEstimationSession = async () => {
+    const session = await convex.mutation(api.estimationSessions.create, {
+      iterationId,
+    });
+
+    navigate(`/iterations/${iterationId}/estimation/${session._id}`);
+  }
 
   if (!iteration || !tasks) return <div>Loading...</div>;
 
@@ -68,20 +82,7 @@ export default function IterationDetails() {
               Add Task
             </button>
             <button
-              onClick={async () => {
-                const managerId = nanoid();
-                sessionStorage.setItem("participantId", managerId);
-                sessionStorage.setItem("participantName", "Iteration Manager");
-                
-                const session = await createEstimationSession({
-                  convex,
-                  iterationId,
-                  managerId,
-                  managerName: "Iteration Manager",
-                });
-
-                window.open(`/iterations/${iterationId}/estimation/${session.sessionUrl}`, "_blank");
-              }}
+              onClick={startEstimationSession}
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
             >
               Start Estimation Session
@@ -92,8 +93,8 @@ export default function IterationDetails() {
         <TaskList
           tasks={tasks}
           columns={columns}
-          onStatusUpdate={(taskId, newStatus) => {
-            updateStatus({ id: taskId, status: newStatus });
+          onStatusUpdate={async (taskId, newStatus) => {
+            await updateStatus({ iterationId, id: taskId, status: newStatus });
           }}
         />
       </div>

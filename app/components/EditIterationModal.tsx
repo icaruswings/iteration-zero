@@ -1,18 +1,10 @@
 import { useMutation } from "convex/react";
 import { useState } from "react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "convex/_generated/dataModel";
+import { Doc, Id } from "convex/_generated/dataModel";
 
 interface EditIterationModalProps {
-  iteration: {
-    _id: Id<"iterations">;
-    name: string;
-    startDate: string;
-    endDate: string;
-    description: string;
-    goals: string[];
-    status: string;
-  };
+  iteration: Doc<"iterations">;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -29,7 +21,6 @@ export default function EditIterationModal({
     startDate: iteration.startDate,
     endDate: iteration.endDate,
     description: iteration.description,
-    goals: iteration.goals,
     status: iteration.status,
   });
 
@@ -42,24 +33,6 @@ export default function EditIterationModal({
       ...formData,
     });
     onClose();
-  };
-
-  const addGoal = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && newGoal.trim()) {
-      e.preventDefault();
-      setFormData({
-        ...formData,
-        goals: [...formData.goals, newGoal.trim()],
-      });
-      setNewGoal("");
-    }
-  };
-
-  const removeGoal = (index: number) => {
-    setFormData({
-      ...formData,
-      goals: formData.goals.filter((_, i) => i !== index),
-    });
   };
 
   if (!isOpen) return null;
@@ -130,38 +103,7 @@ export default function EditIterationModal({
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Goals
-            </label>
-            <div className="mt-2 space-y-2">
-              {formData.goals.map((goal, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 p-2 rounded"
-                >
-                  <span className="text-gray-800 dark:text-gray-200">{goal}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeGoal(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              <input
-                type="text"
-                value={newGoal}
-                onChange={(e) => setNewGoal(e.target.value)}
-                onKeyDown={addGoal}
-                placeholder="Add a new goal (press Enter)"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-              />
-            </div>
-          </div>
-
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Status

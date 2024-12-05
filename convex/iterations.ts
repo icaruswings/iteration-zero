@@ -1,70 +1,91 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+export const get = query({
+  args: { id: v.id("iterations") },
+  handler: async (ctx, { id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const iteration = await ctx.db.query("iterations")
+    .withIndex("by_creator", (q) => q.eq("createdBy", identity.subject))
+    .filter((q) => q.eq(q.field("_id"), id)).first();
+
+    if (!iteration) throw new Error("Iteration not found");
+
+    return iteration;
+  },
+});
+
 export const create = mutation({
   args: {
     name: v.string(),
     startDate: v.string(),
     endDate: v.string(),
     description: v.string(),
-    goals: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const now = new Date().toISOString();
+
     const iteration = await ctx.db.insert("iterations", {
       ...args,
       status: "active",
+      createdAt: now,
+      createdBy: identity.subject,
     });
+
     return iteration;
   },
 });
 
 export const list = query({
-  args: {
-    status: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    let q = ctx.db.query("iterations");
-    
-    if (args.status) {
-      q = q.filter((q) => q.eq(q.field("status"), args.status));
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
     }
-    
-    return await q.collect();
-  },
-});
 
-export const getById = query({
-  args: { id: v.id("iterations") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
-  },
-});
+    const iterations = await ctx.db.query("iterations")
+      .withIndex("by_creator", (q) => q.eq("createdBy", identity.subject))
+      .collect();
 
-export const get = query({
-  args: { id: v.id("iterations") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
+    return iterations;
   },
 });
 
 export const update = mutation({
   args: {
     id: v.id("iterations"),
-    name: v.string(),
-    startDate: v.string(),
-    endDate: v.string(),
-    description: v.string(),
-    goals: v.array(v.string()),
-    status: v.string(),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const { id, ...updates } = args;
-    const iteration = await ctx.db.get(id);
-    
-    if (!iteration) {
-      throw new Error("Iteration not found");
+  handler: async (ctx, { id, ...fields }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
     }
 
-    return await ctx.db.patch(id, updates);
+    const iteration = await ctx.db.query("iterations")
+    .withIndex("by_creator", (q) => q.eq("createdBy", identity.subject))
+    .filter((q) => q.eq(q.field("_id"), id)).first();
+
+    if (!iteration) throw new Error("Iteration not found");
+
+    await ctx.db.patch(id, fields);
+    return;
   },
 });

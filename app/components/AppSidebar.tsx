@@ -1,5 +1,5 @@
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/remix"
-import { Calendar, CircleGauge, History, IterationCw, LogIn, Settings2 } from "lucide-react"
+import { CircleGauge, IterationCw, LogIn, Settings2 } from "lucide-react"
 import { useMemo } from "react";
 import {
     Sidebar,
@@ -16,10 +16,12 @@ import {
     useSidebar,
   } from "~/components/ui/sidebar"
 import { Button } from "./ui/button";
+import { dark } from "@clerk/themes";
+import { useTheme } from "remix-themes";
+import { Link } from "@remix-run/react";
 
   export function AppSidebar() {
-    
-    const { open } = useSidebar();
+    const [theme] = useTheme();
 
     const navItems = useMemo(() => [
         {
@@ -53,10 +55,10 @@ import { Button } from "./ui/button";
           {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <a href={item.url} className="font-medium">
+                    <Link to={item.url} className="font-bold">
                         {item.icon && <item.icon />}
                         <span>{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                   {item.items?.length ? (
                     <SidebarMenuSub className="ml-0 border-l-0 px-1.5">
@@ -65,9 +67,9 @@ import { Button } from "./ui/button";
                           <SidebarMenuSubButton
                             asChild
                           >
-                            <a href={item.url}>
+                            <Link to={item.url} className="font-light">
                                 <span>{item.title}</span>
-                            </a>
+                            </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
@@ -82,14 +84,12 @@ import { Button } from "./ui/button";
         <SidebarFooter>
             <SignedIn>
                 <UserButton appearance={{
+                    baseTheme: theme === "dark" ? dark : undefined,
                     elements: {
                         userButtonBox: {
                             flexDirection: "row-reverse",
                             flexShrink: "0",
                         },
-                        userButtonOuterIdentifier: {
-                            
-                        }
                     },
                 }}
                 showName={true} />

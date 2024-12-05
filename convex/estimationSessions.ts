@@ -1,247 +1,305 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { nanoid } from "nanoid";
 import invariant from "tiny-invariant";
+import { Id } from "./_generated/dataModel";
 
-export const create = mutation({
+export const get = query({
   args: {
-    iterationId: v.id("iterations"),
-    managerId: v.string(),
-    managerName: v.string(),
+    id: v.id("estimationSessions"),
   },
-  handler: async (ctx, args) => {
-    const sessionUrl = nanoid(10); // Generate a short unique URL
-    const now = new Date().toISOString();
-
-    const sessionId = await ctx.db.insert("estimationSessions", {
-      iterationId: args.iterationId,
-      sessionUrl,
-      status: "active",
-      managerId: args.managerId,
-      createdAt: now,
-      participants: [{
-        participantId: args.managerId,
-        name: args.managerName,
-      }],
-    });
-
-    const session = await ctx.db.get(sessionId);
-
+  handler: async (ctx, { id }) => {
+    const session = await ctx.db.get(id);
     invariant(session, "Session not found");
 
     return session;
   },
 });
 
-export const join = mutation({
+export const create = mutation({
   args: {
-    sessionId: v.id("estimationSessions"),
-    participantId: v.string(),
-    participantName: v.string(),
-    email: v.optional(v.string()),
-    imageUrl: v.optional(v.string()),
+    iterationId: v.id("iterations"),
   },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
+  handler: async (ctx, { iterationId, }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const iteration = await ctx.db.query("iterations")
+    .withIndex("by_creator", (q) => q.eq("createdBy", identity.subject))
+    .filter((q) => q.eq(q.field("_id"), iterationId)).unique();
+
+    if (!iteration) throw new Error("Iteration not found");
+
+    const now = new Date().toISOString();
+
+    const sessionId = await ctx.db.insert("estimationSessions", {
+      iterationId: iterationId,
+      currentTaskStatus: "waiting",
+      createdBy: identity.subject,
+      createdAt: now,
+      participants: [{
+        userId: identity.subject,
+        name: identity.name || identity.email || "Iteration Manager",
+        joinedAt: now,
+      }],
+    });
+
+    const session = await ctx.db.get(sessionId);
+    invariant(session, "Session not found");
+
+    return session;
+  },
+});
+
+export const joinSession = mutation({
+  args: {
+    id: v.id("estimationSessions"),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, { id, name }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
     if (!session) {
       throw new Error("Session not found");
     }
 
-    if (session.status === "locked") {
-      throw new Error("Session is locked");
-    }
-
     // Check if participant already exists
     const existingParticipant = session.participants.find(
-      (p) => p.participantId === args.participantId
+      (p) => p.userId === identity.subject
     );
+
     if (existingParticipant) {
       return session;
     }
 
     // Add new participant
-    return await ctx.db.patch(args.sessionId, {
-      participants: [...session.participants, {
-        participantId: args.participantId,
-        name: args.participantName,
-        email: args.email,
-        imageUrl: args.imageUrl,
-      }],
+    await ctx.db.patch(id, {
+      participants: [
+        ...session.participants,
+        {
+          userId: identity.subject,
+          name: name || identity.givenName || identity.name || identity.email || "Anonymous",
+          joinedAt: new Date().toISOString(),
+        }
+      ],
     });
+
+    return await ctx.db.get(id);
   },
 });
 
 export const selectTask = mutation({
   args: {
-    sessionId: v.id("estimationSessions"),
+    id: v.id("estimationSessions"),
     taskId: v.union(v.id("tasks"), v.null()),
-    managerId: v.string(),
   },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
+  handler: async (ctx, { id, taskId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
     if (!session) {
       throw new Error("Session not found");
     }
 
-    if (session.managerId !== args.managerId) {
-      throw new Error("Only the manager can select tasks");
+    if (session.createdBy !== identity.subject) {
+      throw new Error("Only the iteration manager can select tasks");
     }
 
-    return await ctx.db.patch(args.sessionId, {
-      taskId: args.taskId ?? undefined,
-      status: "active",
+    await ctx.db.patch(id, {
+      currentTaskId: taskId || undefined,
+      currentTaskStatus: taskId ? "active" : "waiting",
     });
   },
 });
 
-export const submitEstimate = mutation({
+export const submitEstimates = mutation({
   args: {
-    sessionId: v.id("estimationSessions"),
+    id: v.id("estimationSessions"),
     taskId: v.id("tasks"),
-    participantId: v.string(),
-    bestCase: v.number(),
-    likelyCase: v.number(),
-    worstCase: v.number(),
+    estimate: v.number(),
   },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
+  handler: async (ctx, { id, taskId, estimate }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
     if (!session) {
       throw new Error("Session not found");
     }
 
-    if (session.status === "locked") {
-      throw new Error("Session is locked");
+    if (session.currentTaskStatus !== "active") {
+      throw new Error("Session is not active");
     }
 
-    const now = new Date().toISOString();
+    if (session.currentTaskId !== taskId) {
+      throw new Error("Task is not currently being estimated");
+    }
+
+    // Check if user has already submitted an estimate
     const existingEstimate = await ctx.db
       .query("estimates")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("sessionId"), args.sessionId),
-          q.eq(q.field("taskId"), args.taskId),
-          q.eq(q.field("participantId"), args.participantId)
-        )
+      .withIndex("by_session_task", (q) =>
+        q.eq("sessionId", id).eq("taskId", taskId)
       )
-      .first();
+      .filter((q) => q.eq(q.field("participantId"), identity.subject))
+      .unique();
 
     if (existingEstimate) {
-      return await ctx.db.patch(existingEstimate._id, {
-        bestCase: args.bestCase,
-        likelyCase: args.likelyCase,
-        worstCase: args.worstCase,
-        updatedAt: now,
+      // Update existing estimate
+      await ctx.db.patch(existingEstimate._id, {
+        estimate,
+      });
+    } else {
+      // Create new estimate
+      await ctx.db.insert("estimates", {
+        sessionId: id,
+        taskId,
+        participantId: identity.subject,
+        estimate,
+        createdAt: new Date().toISOString(),
       });
     }
 
-    return await ctx.db.insert("estimates", {
-      sessionId: args.sessionId,
-      taskId: args.taskId,
-      participantId: args.participantId,
-      bestCase: args.bestCase,
-      likelyCase: args.likelyCase,
-      worstCase: args.worstCase,
-      createdAt: now,
-      updatedAt: now,
-    });
-  },
-});
-
-export const lockEstimates = mutation({
-  args: {
-    sessionId: v.id("estimationSessions"),
-    managerId: v.string(),
-  },
-  handler: async (ctx, args) => { 
-    const session = await ctx.db.get(args.sessionId);
-    if (!session) {
-      throw new Error("Session not found");
-    }
-
-    if (session.managerId !== args.managerId) {
-      throw new Error("Only the session manager can lock estimates");
-    }
-
-    // Lock the session
-    return await ctx.db.patch(args.sessionId, {
-      status: "locked",
-    });
+    return session;
   },
 });
 
 export const saveFinalEstimates = mutation({
   args: {
-    sessionId: v.id("estimationSessions"),
+    id: v.id("estimationSessions"),
     taskId: v.id("tasks"),
-    managerId: v.string(),
-    bestCase: v.number(),
-    likelyCase: v.number(),
-    worstCase: v.number(),
+    estimate: v.number(),
   },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
+  handler: async (ctx, { id, taskId, estimate }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
     if (!session) {
       throw new Error("Session not found");
     }
 
-    if (session.managerId !== args.managerId) {
-      throw new Error("Only the session manager can save final estimates");
+    if (session.createdBy !== identity.subject) {
+      throw new Error("Only the session creator can save final estimates");
     }
 
-    // Update task with final estimates
-    await ctx.db.patch(args.taskId, {
-      bestCaseEstimate: args.bestCase,
-      likelyCaseEstimate: args.likelyCase,
-      worstCaseEstimate: args.worstCase,
+    const task = await ctx.db.get(taskId);
+
+    if (!task) {
+      throw new Error("Task not found");
+    }
+
+    // Update task with final estimate
+    await ctx.db.patch(taskId, {
+      estimate,
+    });
+
+    return task;
+  },
+});
+
+export const lockEstimates = mutation({
+  args: {
+    id: v.id("estimationSessions"),
+  },
+  handler: async (ctx, { id }) => { 
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    if (session.createdBy !== identity.subject) {
+      throw new Error("Only the session manager can lock estimates");
+    }
+
+    // Lock the estimates for the current task
+    return await ctx.db.patch(id, {
+      currentTaskStatus: "locked",
     });
   },
 });
 
 export const unlockEstimates = mutation({
   args: {
-    sessionId: v.id("estimationSessions"),
-    managerId: v.string(),
+    id: v.id("estimationSessions"),
   },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    
+  handler: async (ctx, { id }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
     if (!session) {
       throw new Error("Session not found");
     }
 
-    if (session.managerId !== args.managerId) {
-      throw new Error("Only the session manager can unlock estimates");
+    if (session.createdBy !== identity.subject) {
+      throw new Error("Only the session manager can lock estimates");
     }
 
-    await ctx.db.patch(args.sessionId, {
-      status: "active",
+    await ctx.db.patch(id, {
+      currentTaskStatus: "active",
     });
-  },
-});
-
-export const getByUrl = query({
-  args: { sessionUrl: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("estimationSessions")
-      .filter((q) => q.eq(q.field("sessionUrl"), args.sessionUrl))
-      .first();
   },
 });
 
 export const getEstimates = query({
   args: { 
-    sessionId: v.id("estimationSessions"),
+    id: v.id("estimationSessions"),
     taskId: v.id("tasks"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { id, taskId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const session = await ctx.db.get(id);
+
+    if (!session) {
+      throw new Error("Session not found");
+    }
+
+    // if (session.createdBy !== identity.subject) {
+    //   throw new Error("Only the session manager can retrieve estimates");
+    // }
+
     return await ctx.db
       .query("estimates")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("sessionId"), args.sessionId),
-          q.eq(q.field("taskId"), args.taskId)
-        )
+      .withIndex("by_session_task", (q) => 
+        q.eq("sessionId", id).eq("taskId", taskId)
       )
       .collect();
   },
@@ -251,28 +309,59 @@ export const getAllTaskEstimates = query({
   args: { 
     iterationId: v.id("iterations"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { iterationId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+    
     // Get all estimation sessions for this iteration
     const sessions = await ctx.db
       .query("estimationSessions")
-      .filter((q) => q.eq(q.field("iterationId"), args.iterationId))
+      .withIndex("by_iteration", (q) => q.eq("iterationId", iterationId))
       .collect();
 
     if (sessions.length === 0) {
       return [];
     }
 
-    // Get all estimates from these sessions
-    const estimates = await ctx.db
-      .query("estimates")
-      .filter((q) => 
-        q.or(
-          ...sessions.map(session => 
-            q.eq(q.field("sessionId"), session._id)
-          )
-        )
-      )
+    // Get all tasks for this iteration to build a map of final estimates
+    const tasks = await ctx.db
+      .query("tasks")
+      .withIndex("by_iteration", (q) => q.eq("iterationId", iterationId))
       .collect();
+
+    const taskMap = new Map(tasks.map(task => [task._id, task]));
+    const estimates = [];
+
+    // For each session, get its estimates
+    for (const session of sessions) {
+      if (!session.currentTaskId) continue;
+      
+      const sessionEstimates = await ctx.db
+        .query("estimates")
+        .withIndex("by_session_task", (q) => 
+          q.eq("sessionId", session._id)
+            .eq("taskId", session.currentTaskId as Id<"tasks">)
+        )
+        .collect();
+
+      if (sessionEstimates.length > 0) {
+        // Calculate average estimate for this task
+        const sum = sessionEstimates.reduce((acc, curr) => acc + curr.estimate, 0);
+        const average = Math.round(sum / sessionEstimates.length * 10) / 10
+        const task = taskMap.get(session.currentTaskId);
+        
+        if (task) {
+          estimates.push({
+            taskId: session.currentTaskId,
+            taskTitle: task.title,
+            estimate: average
+          });
+        }
+      }
+    }
 
     return estimates;
   },

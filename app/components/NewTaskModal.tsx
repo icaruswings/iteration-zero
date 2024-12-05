@@ -16,9 +16,7 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"High" | "Medium" | "Low">("Medium");
   const [assignee, setAssignee] = useState("");
-  const [bestCaseEstimate, setBestCaseEstimate] = useState(1);
-  const [likelyCaseEstimate, setLikelyCaseEstimate] = useState(2);
-  const [worstCaseEstimate, setWorstCaseEstimate] = useState(3);
+  const [estimate, setEstimate] = useState(0);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,11 +25,9 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
       title,
       description,
       priority,
-      assignee,
-      bestCaseEstimate,
-      likelyCaseEstimate,
-      worstCaseEstimate,
+      estimate,
     });
+
     onClose();
   };
 
@@ -71,49 +67,17 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Best Case (days)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0.5"
-                  step="0.5"
-                  value={bestCaseEstimate}
-                  onChange={(e) => setBestCaseEstimate(parseFloat(e.target.value))}
-                  className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Likely Case (days)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0.5"
-                  step="0.5"
-                  value={likelyCaseEstimate}
-                  onChange={(e) => setLikelyCaseEstimate(parseFloat(e.target.value))}
-                  className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
-                />
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Worst Case (days)
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="0.5"
-                  step="0.5"
-                  value={worstCaseEstimate}
-                  onChange={(e) => setWorstCaseEstimate(parseFloat(e.target.value))}
-                  className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
-                />
-              </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Estimate (days)
+              </label>
+              <input
+                type="text"
+                required
+                value={estimate}
+                onChange={(e) => setEstimate(parseFloat(e.target.value))}
+                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
+              />
             </div>
 
             <div>
