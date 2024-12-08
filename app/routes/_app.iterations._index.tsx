@@ -7,7 +7,7 @@ import IterationList from "../components/IterationList";
 
 export const meta: MetaFunction = () => {
   return [
-    { title: "Development Iterations" },
+    { title: "Iterations" },
     { name: "description", content: "Manage your software development iterations" },
   ];
 };

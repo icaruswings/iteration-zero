@@ -6,6 +6,16 @@ import { useUser } from "@clerk/remix";
 import { Id } from "convex/_generated/dataModel";
 import invariant from "tiny-invariant";
 
+const ESTIMATE_SIZES = ["SM", "MD", "LG", "XLG"] as const;
+type EstimateSize = typeof ESTIMATE_SIZES[number];
+
+const ESTIMATE_DAYS = {
+  SM: { best: 1, likely: 2, worst: 3 },
+  MD: { best: 2, likely: 3, worst: 5 },
+  LG: { best: 3, likely: 5, worst: 8 },
+  XLG: { best: 5, likely: 8, worst: 13 },
+} as const;
+
 export default function EstimationSession() {
   const { iterationId, id } = useParams<{ iterationId: Id<"iterations">; id: Id<"estimationSessions"> }>();
   invariant(!!iterationId, "iterationId is required");
@@ -13,7 +23,7 @@ export default function EstimationSession() {
 
   const { user } = useUser();
   const [estimationFilter, setEstimationFilter] = useState("all");
-  const [estimate, setEstimate] = useState(0);
+  const [estimate, setEstimate] = useState<EstimateSize>("MD");
 
   // All hooks must be called unconditionally at the top level
   const session = useQuery(api.estimationSessions.get,
@@ -71,9 +81,14 @@ export default function EstimationSession() {
 
   const isManager = session.createdBy === user.id;
   const currentEstimate = allEstimates?.find(e => e.participantId === user.id);
+  
+  // Calculate the most common estimate (mode)
   const averageEstimate = allEstimates && allEstimates.length > 0
-    ? allEstimates.reduce((acc, curr) => acc + curr.estimate, 0) / allEstimates.length
-    : 0;
+    ? ESTIMATE_SIZES.reduce((acc, size) => {
+        const count = allEstimates.filter(e => e.estimate === size).length;
+        return count > acc.count ? { size, count } : acc;
+      }, { size: "MD" as EstimateSize, count: 0 }).size
+    : undefined;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -201,17 +216,17 @@ export default function EstimationSession() {
                 <button
                   onClick={async () => {
                     if (session.currentTaskStatus === "active" && allEstimates && allEstimates.length > 0) {
-                      // Calculate averages
-                      const avgEstimate = allEstimates.reduce(
-                        (acc, curr) => acc + curr.estimate,
-                        0
-                      ) / allEstimates.length;
+                      // Calculate mode of estimates
+                      const modeEstimate = ESTIMATE_SIZES.reduce((acc, size) => {
+                        const count = allEstimates.filter(e => e.estimate === size).length;
+                        return count > acc.count ? { size, count } : acc;
+                      }, { size: "MD" as EstimateSize, count: 0 }).size;
                       
                       // Save final estimates
                       await saveFinalEstimates({
                         id: session._id,
                         taskId: task._id,
-                        estimate: avgEstimate,
+                        estimate: modeEstimate,
                       });
 
                       // Lock the session
@@ -263,7 +278,7 @@ export default function EstimationSession() {
               {isManager ? (
                 <div>
                   <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Average Estimate (days)
+                    Average Estimate
                   </label>
                   <div className="block w-full text-center text-2xl font-medium h-16 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-100 flex items-center justify-center">
                     {averageEstimate}
@@ -272,16 +287,38 @@ export default function EstimationSession() {
               ) : (
                 <div>
                   <label className="block text-base font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Estimate (days)
+                    Estimate (T-Shirt Size)
                   </label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    step="0.5"
-                    value={estimate || currentEstimate?.estimate || 0}
-                    onChange={(e) => setEstimate(parseFloat(e.target.value))}
-                    className="block w-full text-center text-2xl font-medium h-16 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100"
-                  />
+                  <div className="flex gap-2 justify-center">
+                    {ESTIMATE_SIZES.map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => setEstimate(size)}
+                        className={`px-4 py-2 rounded-lg text-lg font-medium transition-colors ${
+                          estimate === size
+                            ? size === "SM"
+                              ? "bg-green-500 text-white"
+                              : size === "MD"
+                              ? "bg-blue-500 text-white"
+                              : size === "LG"
+                              ? "bg-yellow-500 text-white"
+                              : "bg-orange-500 text-white"
+                            : "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+                        }`}
+                      >
+                        {size}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                    {estimate && (
+                      <span>
+                        Best: {ESTIMATE_DAYS[estimate].best} days | 
+                        Likely: {ESTIMATE_DAYS[estimate].likely} days | 
+                        Worst: {ESTIMATE_DAYS[estimate].worst} days
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -302,49 +339,12 @@ export default function EstimationSession() {
             </div>
           )}
 
-          {isManager && session.currentTaskStatus === "active" && allEstimates && allEstimates.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-100">Submitted Estimates</h3>
-              <div className="space-y-4">
-                {allEstimates
-                  .filter(estimate => {
-                    const participant = session.participants.find(p => p.userId === estimate.participantId);
-                    return participant?.userId !== session.createdBy;
-                  })
-                  .map((estimate) => {
-                    const participant = session.participants.find(
-                      (p) => p.userId === estimate.participantId
-                    );
-                    return (
-                      <div
-                        key={estimate._id}
-                        className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-800 dark:text-gray-100">
-                            {participant?.userId === user.id ? "Me" : participant?.name}
-                          </span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(estimate.createdAt).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Estimate:</span>
-                          <span className="ml-2 text-gray-800 dark:text-gray-100">{estimate.estimate} days</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </div>
-          )}
-
           {session.currentTaskStatus === "locked" && allEstimates && (
             <div className="mt-8">
               <h3 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Final Estimate</h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Days
+                  T-Shirt Size
                 </label>
                 <div className="mt-1 text-lg text-gray-800 dark:text-gray-100">{averageEstimate}</div>
               </div>

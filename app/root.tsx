@@ -40,24 +40,22 @@ export const loader = async (args: LoaderFunctionArgs) => {
   });
 };
 
-export const useRootLoaderData = () =>
-  useRouteLoaderData<typeof loader>("root");
-
 function Layout({ children }: { children: React.ReactNode }) {
-  const [theme] = useTheme()
+  const data = useLoaderData<typeof loader>();
+  const [theme] = useTheme();
 
   return (
-    <html lang="en" className={clsx(theme)}>
+    <html lang="en" data-theme={theme} className={theme ?? ""}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        <PreventFlashOnWrongTheme ssrTheme={Boolean(theme)} />
         <Links />
       </head>
-      <body className="h-screen flex flex-col bg-background">
+      <body className="min-h-screen bg-background font-sans antialiased">
         {children}
         <ScrollRestoration />
+        <PreventFlashOnWrongTheme ssrTheme={Boolean(data?.theme)} />
         <Scripts />
       </body>
     </html>

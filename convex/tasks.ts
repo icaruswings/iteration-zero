@@ -31,7 +31,7 @@ export const create = mutation({
     title: v.string(),
     description: v.string(),
     priority: v.union(v.literal("High"), v.literal("Medium"), v.literal("Low")),
-    estimate: v.number(),
+    estimate: v.union(v.literal("SM"), v.literal("MD"), v.literal("LG"), v.literal("XLG")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();

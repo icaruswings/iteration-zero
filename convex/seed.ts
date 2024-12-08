@@ -16,7 +16,7 @@ type SeedData = {
     description: string;
     priority: "High" | "Medium" | "Low";
     status: "pending" | "in_progress" | "completed";
-    estimate: number;
+    estimate: "SM" | "MD" | "LG" | "XLG";
     createdAt: string;
     completedAt?: string;
     sprintIndex: number;
@@ -66,14 +66,15 @@ const seedData: SeedData = {
     },
   ],
   tasks: [
+    // Previous Sprint Tasks (completed)
     {
       title: "Setup Authentication",
       description: "Implement user authentication using Clerk",
       priority: "High",
       status: "completed",
-      estimate: 3,
+      estimate: "MD", // 2-5 days
       createdAt: formatDate(previousIterationStart),
-      completedAt: formatDate(addDays(previousIterationStart, 2)),
+      completedAt: formatDate(addDays(previousIterationStart, 3)), // Took 3 days
       sprintIndex: 0,
     },
     {
@@ -81,9 +82,9 @@ const seedData: SeedData = {
       description: "Create reusable UI components",
       priority: "Medium",
       status: "completed",
-      estimate: 5,
-      createdAt: formatDate(addDays(previousIterationStart, 1)),
-      completedAt: formatDate(addDays(previousIterationStart, 5)),
+      estimate: "LG", // 3-8 days
+      createdAt: formatDate(previousIterationStart),
+      completedAt: formatDate(addDays(previousIterationStart, 6)), // Took 6 days
       sprintIndex: 0,
     },
     {
@@ -91,28 +92,19 @@ const seedData: SeedData = {
       description: "Design and implement initial database schema",
       priority: "High",
       status: "completed",
-      estimate: 2,
+      estimate: "LG", // 3-8 days
       createdAt: formatDate(addDays(previousIterationStart, 2)),
-      completedAt: formatDate(addDays(previousIterationStart, 3)),
+      completedAt: formatDate(addDays(previousIterationStart, 7)), // Took 5 days
       sprintIndex: 0,
-    },
-    {
-      title: "Task Management Features",
-      description: "Implement CRUD operations for tasks",
-      priority: "Medium",
-      status: "in_progress",
-      estimate: 4,
-      createdAt: formatDate(currentIterationStart),
-      sprintIndex: 1,
     },
     {
       title: "User Profile Page",
       description: "Create user profile page with editable fields",
       priority: "Low",
       status: "completed",
-      estimate: 3,
-      createdAt: formatDate(addDays(previousIterationStart, 3)),
-      completedAt: formatDate(addDays(previousIterationStart, 5)),
+      estimate: "SM", // 1-3 days
+      createdAt: formatDate(addDays(previousIterationStart, 7)),
+      completedAt: formatDate(addDays(previousIterationStart, 9)), // Took 2 days
       sprintIndex: 0,
     },
     {
@@ -120,36 +112,57 @@ const seedData: SeedData = {
       description: "Implement rate limiting for API endpoints",
       priority: "Medium",
       status: "completed",
-      estimate: 2,
-      createdAt: formatDate(addDays(previousIterationStart, 4)),
-      completedAt: formatDate(addDays(previousIterationStart, 5)),
+      estimate: "MD", // 2-5 days
+      createdAt: formatDate(addDays(previousIterationStart, 9)),
+      completedAt: formatDate(addDays(previousIterationStart, 12)), // Took 3 days
       sprintIndex: 0,
     },
+
+    // Current Sprint Tasks
     {
-      title: "Error Handling System",
-      description: "Implement global error handling and logging",
+      title: "Task Management Features",
+      description: "Implement CRUD operations for tasks",
       priority: "High",
-      status: "completed",
-      estimate: 3,
-      createdAt: formatDate(addDays(previousIterationStart, 7)),
-      completedAt: formatDate(addDays(previousIterationStart, 9)),
-      sprintIndex: 0,
+      status: "in_progress",
+      estimate: "XLG", // 5-13 days
+      createdAt: formatDate(currentIterationStart),
+      sprintIndex: 1,
     },
     {
       title: "Performance Optimization",
       description: "Optimize front-end performance and loading times",
       priority: "High",
       status: "in_progress",
-      estimate: 5,
-      createdAt: formatDate(addDays(currentIterationStart, 1)),
+      estimate: "LG", // 3-8 days
+      createdAt: formatDate(currentIterationStart),
       sprintIndex: 1,
     },
+    {
+      title: "Mobile Responsive Design",
+      description: "Ensure all pages are mobile-friendly",
+      priority: "Medium",
+      status: "pending",
+      estimate: "MD", // 2-5 days
+      createdAt: formatDate(currentIterationStart),
+      sprintIndex: 1,
+    },
+    {
+      title: "Error Handling System",
+      description: "Implement global error handling and logging",
+      priority: "High",
+      status: "pending",
+      estimate: "MD", // 2-5 days
+      createdAt: formatDate(currentIterationStart),
+      sprintIndex: 1,
+    },
+
+    // Next Sprint Tasks
     {
       title: "Search Functionality",
       description: "Implement search across tasks and iterations",
       priority: "Medium",
       status: "pending",
-      estimate: 4,
+      estimate: "LG", // 3-8 days
       createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
@@ -158,25 +171,16 @@ const seedData: SeedData = {
       description: "Set up email notifications for task updates",
       priority: "Low",
       status: "pending",
-      estimate: 3,
+      estimate: "SM", // 1-3 days
       createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
-    },
-    {
-      title: "Mobile Responsive Design",
-      description: "Ensure all pages are mobile-friendly",
-      priority: "High",
-      status: "in_progress",
-      estimate: 4,
-      createdAt: formatDate(addDays(currentIterationStart, 2)),
-      sprintIndex: 1,
     },
     {
       title: "Analytics Dashboard",
       description: "Create dashboard for tracking project metrics",
       priority: "Medium",
       status: "pending",
-      estimate: 5,
+      estimate: "XLG", // 5-13 days
       createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
@@ -185,7 +189,7 @@ const seedData: SeedData = {
       description: "Write technical documentation and API guides",
       priority: "Low",
       status: "pending",
-      estimate: 3,
+      estimate: "MD", // 2-5 days
       createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
     },
@@ -194,36 +198,9 @@ const seedData: SeedData = {
       description: "Perform security audit and implement fixes",
       priority: "High",
       status: "pending",
-      estimate: 4,
-      createdAt: formatDate(addDays(nextIterationStart, 1)),
+      estimate: "LG", // 3-8 days
+      createdAt: formatDate(nextIterationStart),
       sprintIndex: 2,
-    },
-    {
-      title: "Accessibility Improvements",
-      description: "Implement WCAG 2.1 compliance changes",
-      priority: "Medium",
-      status: "pending",
-      estimate: 4,
-      createdAt: formatDate(addDays(nextIterationStart, 1)),
-      sprintIndex: 2,
-    },
-    {
-      title: "Burndown Chart",
-      description: "Create burndown chart visualization",
-      priority: "High",
-      status: "in_progress",
-      estimate: 3,
-      createdAt: formatDate(addDays(currentIterationStart, 1)),
-      sprintIndex: 1,
-    },
-    {
-      title: "Estimation Sessions",
-      description: "Implement real-time estimation sessions",
-      priority: "Medium",
-      status: "pending",
-      estimate: 5,
-      createdAt: formatDate(addDays(currentIterationStart, 1)),
-      sprintIndex: 1,
     },
   ],
 };
