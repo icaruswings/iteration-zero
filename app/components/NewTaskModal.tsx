@@ -16,7 +16,7 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<"High" | "Medium" | "Low">("Medium");
   const [assignee, setAssignee] = useState("");
-  const [estimate, setEstimate] = useState(0);
+  const [estimate, setEstimate] = useState<"SM" | "MD" | "LG" | "XLG">("MD");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,15 +69,27 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Estimate (days)
+                Estimate (T-Shirt Size)
               </label>
-              <input
-                type="text"
-                required
-                value={estimate}
-                onChange={(e) => setEstimate(parseFloat(e.target.value))}
-                className="w-full rounded-md border border-gray-300 p-2 dark:border-gray-600 dark:bg-gray-700"
-              />
+              <div className="grid grid-cols-4 gap-2">
+                {(["SM", "MD", "LG", "XLG"] as const).map((size) => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setEstimate(size)}
+                    className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                      estimate === size
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                SM: Small (1 point) • MD: Medium (2 points) • LG: Large (4 points) • XLG: Extra Large (8 points)
+              </p>
             </div>
 
             <div>
@@ -109,7 +121,7 @@ export default function NewTaskModal({ isOpen, onClose, iterationId }: NewTaskMo
             </div>
           </div>
 
-          <div className="flex justify-end gap-4">
+          <div className="mt-6 flex justify-end gap-4">
             <button
               type="button"
               onClick={onClose}

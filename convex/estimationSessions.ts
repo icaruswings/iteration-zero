@@ -129,7 +129,7 @@ export const submitEstimates = mutation({
   args: {
     id: v.id("estimationSessions"),
     taskId: v.id("tasks"),
-    estimate: v.number(),
+    estimate: v.union(v.literal("SM"), v.literal("MD"), v.literal("LG"), v.literal("XLG")),
   },
   handler: async (ctx, { id, taskId, estimate }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -185,7 +185,7 @@ export const saveFinalEstimates = mutation({
   args: {
     id: v.id("estimationSessions"),
     taskId: v.id("tasks"),
-    estimate: v.number(),
+    estimate: v.union(v.literal("SM"), v.literal("MD"), v.literal("LG"), v.literal("XLG")),
   },
   handler: async (ctx, { id, taskId, estimate }) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -335,6 +335,25 @@ export const getAllTaskEstimates = query({
     const taskMap = new Map(tasks.map(task => [task._id, task]));
     const estimates = [];
 
+    // Convert t-shirt size to points for calculation
+    function sizeToPoints(size: "SM" | "MD" | "LG" | "XLG"): number {
+      switch (size) {
+        case "SM": return 1;
+        case "MD": return 3;
+        case "LG": return 5;
+        case "XLG": return 8;
+        default: return 0;
+      }
+    }
+
+    // Convert points back to t-shirt size
+    function pointsToSize(points: number): "SM" | "MD" | "LG" | "XLG" {
+      if (points <= 1.5) return "SM";
+      if (points <= 3.5) return "MD";
+      if (points <= 6) return "LG";
+      return "XLG";
+    }
+
     // For each session, get its estimates
     for (const session of sessions) {
       if (!session.currentTaskId) continue;
@@ -349,15 +368,16 @@ export const getAllTaskEstimates = query({
 
       if (sessionEstimates.length > 0) {
         // Calculate average estimate for this task
-        const sum = sessionEstimates.reduce((acc, curr) => acc + curr.estimate, 0);
-        const average = Math.round(sum / sessionEstimates.length * 10) / 10
+        const sum = sessionEstimates.reduce((acc, curr) => acc + (typeof curr.estimate === 'number' ? curr.estimate : sizeToPoints(curr.estimate as "SM" | "MD" | "LG" | "XLG")), 0);
+        const averagePoints = sum / sessionEstimates.length;
+        const finalEstimate = typeof sessionEstimates[0].estimate === 'number' ? averagePoints : pointsToSize(averagePoints);
         const task = taskMap.get(session.currentTaskId);
         
         if (task) {
           estimates.push({
             taskId: session.currentTaskId,
             taskTitle: task.title,
-            estimate: average
+            estimate: finalEstimate
           });
         }
       }

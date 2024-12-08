@@ -21,7 +21,7 @@ interface TaskListProps {
 function formatDate(dateStr?: string): string {
   if (!dateStr) return "";
   const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', { 
+  return date.toLocaleDateString('en-AU', { 
     month: 'short', 
     day: 'numeric',
     year: 'numeric'
@@ -132,8 +132,13 @@ export default function TaskList({ tasks: serverTasks, columns, onStatusUpdate }
                                   {getDaysDifference(task.createdAt)} days in progress
                                 </span>
                               ) : (
-                                <span className="text-gray-500 dark:text-gray-400">
-                                  Est. {task.estimate} days
+                                <span className={`inline-flex items-center rounded px-2 py-1 text-xs font-medium ${
+                                  task.estimate === "SM" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" :
+                                  task.estimate === "MD" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100" :
+                                  task.estimate === "LG" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100" :
+                                  "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                                }`}>
+                                  {task.estimate}
                                 </span>
                               )}
                             </div>

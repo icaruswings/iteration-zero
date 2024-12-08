@@ -3,7 +3,7 @@ import { useConvex, useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import NewTaskModal from "../components/NewTaskModal";
 import EditIterationModal from "../components/EditIterationModal";
-import BurndownChart from "~/components/BurndownChart";
+import {BurndownChart} from "~/components/BurndownChart";
 import TaskList from "~/components/TaskList";
 import { api } from "convex/_generated/api";
 import { Id } from "convex/_generated/dataModel";
@@ -15,7 +15,6 @@ export default function IterationDetails() {
 
   const navigate = useNavigate();
   const convex = useConvex();
-  const { userId  } = useAuth();
 
   const iteration = useQuery(api.iterations.get, { id: iterationId });
   const tasks = useQuery(api.tasks.list, { iterationId });
@@ -50,7 +49,7 @@ export default function IterationDetails() {
   if (!iteration || !tasks) return <div>Loading...</div>;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="px-4 py-8">
       <header className="mb-8">
         <div className="flex justify-between items-start">
           <div>
@@ -68,7 +67,7 @@ export default function IterationDetails() {
         </div>
       </header>
 
-      <BurndownChart iterationId={id as Id<"iterations">} />
+      <BurndownChart startDate={iteration.startDate} endDate={iteration.endDate ?? null} tasks={tasks} />
 
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">

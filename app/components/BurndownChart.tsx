@@ -1,6 +1,5 @@
-import { useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import { Doc } from "../../convex/_generated/dataModel";
+import { calculateBurndownProgress } from "~/utils/burndown";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,10 +9,13 @@ import {
   Title,
   Tooltip,
   Legend,
+  ChartOptions,
 } from "chart.js";
+import annotationPlugin from 'chartjs-plugin-annotation';
 import { Line } from "react-chartjs-2";
-import { useState } from "react";
+import { Card } from "./ui/card";
 
+// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -21,136 +23,265 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  annotationPlugin
 );
 
 interface BurndownChartProps {
-  iterationId: Id<"iterations">;
+  startDate: string;
+  endDate: string | null;
+  tasks: Doc<"tasks">[];
 }
 
-export default function BurndownChart({ iterationId }: BurndownChartProps) {
-  const [showHint, setShowHint] = useState(() => {
-    const stored = localStorage.getItem('burndown-chart-hint');
-    return stored === null ? true : stored === 'true';
-  });
-
-  const handleCloseHint = () => {
-    setShowHint(false);
-    localStorage.setItem('burndown-chart-hint', 'false');
+export function BurndownChart({ startDate, endDate, tasks }: BurndownChartProps) {
+  const progress = calculateBurndownProgress(startDate, endDate, tasks);
+  
+  // Calculate the initial timeline based on the total effort (likely case)
+  const startTime = new Date(startDate).getTime();
+  const totalDays = progress.totalEffort.likely; // One day per effort point
+  const staticEndTime = startTime + (totalDays * 24 * 60 * 60 * 1000);
+  
+  const labels = [];
+  const bestData = [];
+  const likelyData = [];
+  const worstData = [];
+  const actualBestData = [];
+  const actualLikelyData = [];
+  const actualWorstData = [];
+  
+  // Calculate velocities for each scenario relative to the likely case
+  const bestVelocity = progress.totalEffort.best / progress.totalEffort.likely;
+  const worstVelocity = progress.totalEffort.worst / progress.totalEffort.likely;
+  
+  // Create timelines of completed tasks for each scenario
+  const completedTimelines = {
+    best: new Map<string, number>(),
+    likely: new Map<string, number>(),
+    worst: new Map<string, number>(),
   };
 
-  const iteration = useQuery(api.iterations.get, { id: iterationId });
-  const tasks = useQuery(api.tasks.list, { iterationId });
+  let runningTotals = {
+    best: progress.totalEffort.best,
+    likely: progress.totalEffort.likely,
+    worst: progress.totalEffort.worst,
+  };
 
-  if (!iteration || !tasks) return null;
+  // Initialize start points
+  completedTimelines.best.set(startDate, runningTotals.best);
+  completedTimelines.likely.set(startDate, runningTotals.likely);
+  completedTimelines.worst.set(startDate, runningTotals.worst);
 
-  const startDate = new Date(iteration.startDate);
-  const endDate = new Date(iteration.endDate);
-  const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Sort tasks by completion date
+  const completedTasks = tasks
+    .filter(task => task.status === 'completed' && task.completedAt)
+    .sort((a, b) => new Date(a.completedAt!).getTime() - new Date(b.completedAt!).getTime());
 
-  // Calculate total effort
-  const totalEffort = tasks.reduce((sum, task) => sum + (task.estimate || 0), 0);
-
-  // Generate dates array
-  const dates = Array.from({ length: totalDays + 1 }, (_, i) => {
-    const date = new Date(startDate);
-    date.setDate(date.getDate() + i);
-    return date.toISOString().split('T')[0];
+  // Build timeline of completed work
+  completedTasks.forEach(task => {
+    if (task.estimate && task.completedAt) {
+      const estimate = task.estimate;
+      switch (estimate) {
+        case 'SM':
+          runningTotals.best -= 1;
+          runningTotals.likely -= 2;
+          runningTotals.worst -= 3;
+          break;
+        case 'MD':
+          runningTotals.best -= 2;
+          runningTotals.likely -= 3;
+          runningTotals.worst -= 5;
+          break;
+        case 'LG':
+          runningTotals.best -= 3;
+          runningTotals.likely -= 5;
+          runningTotals.worst -= 8;
+          break;
+        case 'XLG':
+          runningTotals.best -= 5;
+          runningTotals.likely -= 8;
+          runningTotals.worst -= 13;
+          break;
+      }
+      completedTimelines.best.set(task.completedAt, Math.max(0, runningTotals.best));
+      completedTimelines.likely.set(task.completedAt, Math.max(0, runningTotals.likely));
+      completedTimelines.worst.set(task.completedAt, Math.max(0, runningTotals.worst));
+    }
   });
 
-  // Calculate ideal burndown line
-  const idealBurndown = dates.map((_, i) => totalEffort * (1 - i / totalDays));
+  // Add current date to timeline if there's still work remaining
+  const now = new Date().toISOString();
+  if (!completedTimelines.best.has(now)) {
+    completedTimelines.best.set(now, runningTotals.best);
+    completedTimelines.likely.set(now, runningTotals.likely);
+    completedTimelines.worst.set(now, runningTotals.worst);
+  }
+  
+  for (let day = 0; day <= totalDays; day++) {
+    const date = new Date(startTime + day * 24 * 60 * 60 * 1000);
+    labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
 
-  // Calculate actual burndown line
-  const today = new Date().toISOString().split('T')[0];
-  const actualBurndown = dates.map(date => {
-    if (date > today) return null;
-    const completedTasks = tasks.filter(task => 
-      task.status === "completed" && 
-      task.completedAt && 
-      task.completedAt.split('T')[0] <= date
-    );
-    const completedEffort = completedTasks.reduce((sum, task) => sum + (task.estimate || 0), 0);
-    return totalEffort - completedEffort;
-  });
+    // Calculate remaining work for each scenario based on their relative velocities
+    const timeProgress = day / totalDays;
+    
+    // Best case burns down faster
+    const bestProgress = Math.min(1, timeProgress / bestVelocity);
+    bestData.push(Math.max(0, progress.totalEffort.best * (1 - bestProgress)));
+
+    // Likely case burns down linearly
+    likelyData.push(Math.max(0, progress.totalEffort.likely * (1 - timeProgress)));
+
+    // Worst case burns down slower
+    const worstProgress = Math.min(1, timeProgress * bestVelocity);
+    worstData.push(Math.max(0, progress.totalEffort.worst * (1 - worstProgress)));
+
+    // Find actual progress for this date
+    const currentDate = new Date();
+    currentDate.setHours(23, 59, 59, 999); // End of current day
+    
+    // Only add actual data points up to current date
+    if (date <= currentDate) {
+      // Find the last completed values before or on this date
+      let actualBestValue = progress.totalEffort.best;
+      let actualLikelyValue = progress.totalEffort.likely;
+      let actualWorstValue = progress.totalEffort.worst;
+      
+      for (const [completedDate, bestValue] of completedTimelines.best) {
+        if (completedDate <= date.toISOString()) {
+          actualBestValue = bestValue;
+        } else {
+          break;
+        }
+      }
+      
+      for (const [completedDate, likelyValue] of completedTimelines.likely) {
+        if (completedDate <= date.toISOString()) {
+          actualLikelyValue = likelyValue;
+        } else {
+          break;
+        }
+      }
+      
+      for (const [completedDate, worstValue] of completedTimelines.worst) {
+        if (completedDate <= date.toISOString()) {
+          actualWorstValue = worstValue;
+        } else {
+          break;
+        }
+      }
+      
+      actualBestData.push(actualBestValue);
+      actualLikelyData.push(actualLikelyValue);
+      actualWorstData.push(actualWorstValue);
+    } else {
+      actualBestData.push(null);
+      actualLikelyData.push(null);
+      actualWorstData.push(null);
+    }
+  }
 
   const data = {
-    labels: dates.map(d => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })),
+    labels,
     datasets: [
       {
-        label: "Estimated Progress",
-        data: idealBurndown,
-        borderColor: "rgba(54, 162, 235, 0.5)",
-        backgroundColor: "transparent",
+        label: 'Best Case (Estimated)',
+        data: bestData,
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.5)',
         borderDash: [5, 5],
       },
       {
-        label: "Actual Progress",
-        data: actualBurndown,
-        borderColor: "rgb(54, 162, 235)",
-        backgroundColor: "transparent",
+        label: 'Best Case (Actual)',
+        data: actualBestData,
+        borderColor: 'rgb(34, 197, 94)',
+        backgroundColor: 'rgba(34, 197, 94, 0.5)',
+        borderWidth: 2,
+      },
+      {
+        label: 'Likely Case (Estimated)',
+        data: likelyData,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderDash: [5, 5],
+      },
+      {
+        label: 'Likely Case (Actual)',
+        data: actualLikelyData,
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderWidth: 2,
+      },
+      {
+        label: 'Worst Case (Estimated)',
+        data: worstData,
+        borderColor: 'rgb(249, 115, 22)',
+        backgroundColor: 'rgba(249, 115, 22, 0.5)',
+        borderDash: [5, 5],
+      },
+      {
+        label: 'Worst Case (Actual)',
+        data: actualWorstData,
+        borderColor: 'rgb(249, 115, 22)',
+        backgroundColor: 'rgba(249, 115, 22, 0.5)',
         borderWidth: 2,
       },
     ],
   };
 
-  const options = {
+  const options: ChartOptions<'line'> = {
     responsive: true,
-    maintainAspectRatio: true,
-    aspectRatio: 2,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: true,
         position: 'top' as const,
       },
-      title: {
-        display: false,
+      tooltip: {
+        mode: 'index' as const,
+        intersect: false,
       },
+      annotation: endDate ? {
+        annotations: {
+          endDateLine: {
+            type: 'line',
+            xMin: new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            xMax: new Date(endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            borderColor: 'rgb(107, 114, 128)',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            label: {
+              display: true,
+              content: 'End Date',
+              position: 'start'
+            }
+          }
+        }
+      } : undefined
+    },
+    hover: {
+      mode: 'nearest' as const,
+      intersect: true,
     },
     scales: {
       y: {
         beginAtZero: true,
         title: {
           display: true,
-          text: "Remaining Effort (days)",
+          text: 'Total Effort (Days)',
         },
       },
       x: {
         title: {
-          display: false,
+          display: true,
+          text: 'Date',
         },
       },
     },
   };
 
   return (
-    <div className="space-y-4">
-      {showHint && (
-        <div className="relative text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
-          <button
-            onClick={handleCloseHint}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            aria-label="Close hint"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <p className="mb-2">
-            <span className="font-medium">How to read this chart:</span> The burndown chart shows the remaining effort over time.
-          </p>
-          <ul className="list-disc list-inside space-y-1">
-            <li>The dashed line shows the ideal progress</li>
-            <li>The solid line shows your actual progress</li>
-            <li>Steeper slopes indicate faster progress</li>
-          </ul>
-        </div>
-      )}
-      <div className="w-full rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
-        <div className="w-full aspect-[2/1]">
-          <Line options={options} data={data} />
-        </div>
+    <Card className="p-4">
+      <div className="h-[300px]">
+        <Line options={options} data={data} />
       </div>
-    </div>
+    </Card>
   );
 }

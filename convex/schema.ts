@@ -5,7 +5,7 @@ export default defineSchema({
   iterations: defineTable({
     name: v.string(),
     startDate: v.string(),
-    endDate: v.string(),
+    endDate: v.optional(v.string()),
     status: v.string(),
     description: v.string(),
     createdAt: v.string(),
@@ -18,11 +18,12 @@ export default defineSchema({
     description: v.string(),
     status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("completed")),
     priority: v.union(v.literal("High"), v.literal("Medium"), v.literal("Low")),
-    estimate: v.optional(v.number()),
+    estimate: v.optional(v.union(v.literal("SM"), v.literal("MD"), v.literal("LG"), v.literal("XLG"))),
     createdAt: v.string(),
     createdBy: v.string(), // Clerk user ID
     completedAt: v.optional(v.string()),
-  }).index("by_iteration", ["iterationId"]),
+  }).index("by_iteration", ["iterationId"])
+  .index("by_estimate", ["estimate"]),
 
   estimationSessions: defineTable({
     iterationId: v.id("iterations"),
@@ -41,7 +42,7 @@ export default defineSchema({
     sessionId: v.id("estimationSessions"),
     taskId: v.id("tasks"),
     participantId: v.string(), // Clerk user ID
-    estimate: v.number(),
+    estimate: v.union(v.literal("SM"), v.literal("MD"), v.literal("LG"), v.literal("XLG")),
     createdAt: v.string(),
   }).index("by_task", ["taskId"])
   .index("by_session_task", ["sessionId", "taskId"])
